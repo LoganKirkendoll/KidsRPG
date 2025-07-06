@@ -7,10 +7,31 @@ export class SaveSystem {
   
   static saveGame(slot: number, gameState: GameState, settings: GameSettings): boolean {
     try {
+      // Create a deep copy of the game state to avoid modifying the original
+      const gameStateCopy = JSON.parse(JSON.stringify(gameState));
+      
+      // Remove large transient data that can be regenerated
+      delete gameStateCopy.visibilityMap;
+      
+      // Extract only the discovered status of tiles to save space
+      if (gameStateCopy.currentMap && gameStateCopy.currentMap.tiles) {
+        const discoveredTileFlags: boolean[][] = [];
+        for (let y = 0; y < gameStateCopy.currentMap.tiles.length; y++) {
+          discoveredTileFlags[y] = [];
+          for (let x = 0; x < gameStateCopy.currentMap.tiles[y].length; x++) {
+            discoveredTileFlags[y][x] = gameStateCopy.currentMap.tiles[y][x].discovered || false;
+          }
+        }
+        
+        // Replace the tiles array with just the discovered flags
+        gameStateCopy.currentMap.discoveredTileFlags = discoveredTileFlags;
+        delete gameStateCopy.currentMap.tiles;
+      }
+      
       const saveData: SaveData = {
         version: '1.0.0',
         timestamp: Date.now(),
-        gameState: { ...gameState },
+        gameState: gameStateCopy,
         settings: { ...settings }
       };
       

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { GameState, Character, GameSettings, Item, DialogueChoice, Quest } from '../types/game';
 import { createStartingCharacter, createStartingMap, achievements, items } from '../data/gameData';
+import { maps } from '../data/maps';
 import { allQuests } from '../data/quests';
 import { SaveSystem } from '../engine/SaveSystem';
 
@@ -131,7 +132,37 @@ export const useGameState = () => {
   const loadGame = useCallback((slot: number) => {
     const saveData = SaveSystem.loadGame(slot);
     if (saveData) {
-      setGameState(saveData.gameState);
+      const loadedGameState = saveData.gameState;
+      
+      // Reconstruct the currentMap.tiles array from the base map data
+      if (loadedGameState.currentMap && loadedGameState.currentMap.discoveredTileFlags) {
+        // Get the base map data (assuming it's the capital wasteland for now)
+        // In a more complex game, you'd need to store the map ID and look it up
+        const baseMap = maps.capital_wasteland();
+        loadedGameState.currentMap.tiles = baseMap.tiles;
+        
+        // Apply the discovered status from the saved flags
+        const discoveredFlags = loadedGameState.currentMap.discoveredTileFlags;
+        for (let y = 0; y < discoveredFlags.length && y < loadedGameState.currentMap.tiles.length; y++) {
+          for (let x = 0; x < discoveredFlags[y].length && x < loadedGameState.currentMap.tiles[y].length; x++) {
+            loadedGameState.currentMap.tiles[y][x].discovered = discoveredFlags[y][x];
+          }
+        }
+        
+        // Clean up the temporary flags
+        delete loadedGameState.currentMap.discoveredTileFlags;
+      }
+      
+      // Re-initialize the visibility map
+      if (loadedGameState.currentMap && loadedGameState.currentMap.tiles) {
+        const mapHeight = loadedGameState.currentMap.tiles.length;
+        const mapWidth = loadedGameState.currentMap.tiles[0]?.length || 0;
+        loadedGameState.visibilityMap = Array(mapHeight).fill(null).map(() => Array(mapWidth).fill(false));
+      } else {
+        loadedGameState.visibilityMap = [];
+      }
+      
+      setGameState(loadedGameState);
       setSettings(saveData.settings);
       setGameMode('playing');
       return true;
