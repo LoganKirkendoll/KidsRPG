@@ -13,6 +13,7 @@ export class GameEngine {
   private lootableCallback?: (lootable: any) => void;
   private loadedMaps: { [key: string]: GameMap } = {};
   private isTransitioning = false;
+  private transitionCooldown = 0;
 
   constructor(canvas: HTMLCanvasElement, initialGameState: GameState, settings?: any) {
     this.canvas = canvas;
@@ -198,6 +199,11 @@ export class GameEngine {
     if (this.gameState.gameMode !== 'exploration') return;
     if (this.isTransitioning) return; // Prevent movement during transitions
 
+    // Update transition cooldown
+    if (this.transitionCooldown > 0) {
+      this.transitionCooldown -= deltaTime;
+    }
+
     const speed = 128; // pixels per second
     const moveDistance = speed * (deltaTime / 1000);
     
@@ -232,14 +238,12 @@ export class GameEngine {
       const mapWidth = this.gameState.currentMap.width * 32;
       const mapHeight = this.gameState.currentMap.height * 32;
       
-      // Add buffer zone to prevent edge flickering
-      const edgeBuffer = 16;
-      
-      // Check for map transitions
-      if (newX < -edgeBuffer || newX >= mapWidth + edgeBuffer || 
-          newY < -edgeBuffer || newY >= mapHeight + edgeBuffer) {
-        this.handleMapTransition(newX, newY, mapWidth, mapHeight);
-        return;
+      // Check for map transitions with proper boundaries
+      if (this.transitionCooldown <= 0) {
+        if (newX < -16 || newX >= mapWidth + 16 || newY < -16 || newY >= mapHeight + 16) {
+          this.handleMapTransition(newX, newY, mapWidth, mapHeight);
+          return;
+        }
       }
 
       // Check collision with tiles
@@ -266,19 +270,23 @@ export class GameEngine {
   }
 
   private handleMapTransition(newX: number, newY: number, mapWidth: number, mapHeight: number) {
-    if (this.isTransitioning) return; // Prevent multiple transitions
+    if (this.isTransitioning || this.transitionCooldown > 0) return; // Prevent multiple transitions
     
     this.isTransitioning = true;
+    this.transitionCooldown = 1000; // 1 second cooldown
     
     let direction: 'north' | 'south' | 'east' | 'west' | null = null;
-    let targetPosition: Position | null = null;
     
-    if (newX < 0) direction = 'west';
-    else if (newX >= mapWidth) direction = 'east';
-    else if (newY < 0) direction = 'north';
-    else if (newY >= mapHeight) direction = 'south';
+    // Determine direction based on player position
+    if (newX < -16) direction = 'west';
+    else if (newX >= mapWidth + 16) direction = 'east';
+    else if (newY < -16) direction = 'north';
+    else if (newY >= mapHeight + 16) direction = 'south';
     
-    if (!direction) return;
+    if (!direction) {
+      this.isTransitioning = false;
+      return;
+    }
     
     // Find connection for this direction
     const connection = this.gameState.currentMap.connections.find(conn => conn.direction === direction);
@@ -291,7 +299,7 @@ export class GameEngine {
     let targetMap = this.loadedMaps[connection.targetMapId];
     if (!targetMap) {
       // Create the map on demand
-      const createMapFn = maps[connection.targetMapId];
+      const createMapFn = maps[connection.targetMapId as keyof typeof maps];
       if (createMapFn) {
         targetMap = createMapFn();
         this.loadedMaps[connection.targetMapId] = targetMap;
@@ -301,34 +309,39 @@ export class GameEngine {
       }
     }
     
-    // Calculate proper target position based on direction
+    // Calculate proper target position based on direction with safe margins
+    let targetPosition: Position;
+    const safeMargin = 64; // 2 tiles from edge
+    
     switch (direction) {
       case 'north':
-        targetPosition = { x: connection.toPosition.x, y: (targetMap.height - 2) * 32 };
+        targetPosition = { 
+          x: Math.max(safeMargin, Math.min(connection.toPosition.x, (targetMap.width - 2) * 32)), 
+          y: (targetMap.height - 3) * 32 
+        };
         break;
       case 'south':
-        targetPosition = { x: connection.toPosition.x, y: 32 };
+        targetPosition = { 
+          x: Math.max(safeMargin, Math.min(connection.toPosition.x, (targetMap.width - 2) * 32)), 
+          y: safeMargin 
+        };
         break;
       case 'east':
-        targetPosition = { x: 32, y: connection.toPosition.y };
+        targetPosition = { 
+          x: safeMargin, 
+          y: Math.max(safeMargin, Math.min(connection.toPosition.y, (targetMap.height - 2) * 32)) 
+        };
         break;
       case 'west':
-        targetPosition = { x: (targetMap.width - 2) * 32, y: connection.toPosition.y };
+        targetPosition = { 
+          x: (targetMap.width - 3) * 32, 
+          y: Math.max(safeMargin, Math.min(connection.toPosition.y, (targetMap.height - 2) * 32)) 
+        };
         break;
+      default:
+        this.isTransitioning = false;
+        return;
     }
-    
-    if (!targetPosition) {
-      this.isTransitioning = false;
-      return;
-    }
-    
-    // Unload previous map to save memory (keep only current and adjacent)
-    const currentMapId = this.gameState.currentMap.id;
-    Object.keys(this.loadedMaps).forEach(mapId => {
-      if (mapId !== connection.targetMapId && mapId !== currentMapId) {
-        delete this.loadedMaps[mapId];
-      }
-    });
     
     // Switch to new map
     this.gameState.currentMap = targetMap;
@@ -341,16 +354,19 @@ export class GameEngine {
     const tileY = Math.floor(this.gameState.player.position.y / 32);
     
     if (!this.isValidPosition(tileX, tileY)) {
-      // Find nearest walkable tile
-      for (let radius = 1; radius <= 5; radius++) {
-        for (let dy = -radius; dy <= radius; dy++) {
-          for (let dx = -radius; dx <= radius; dx++) {
-            const checkX = tileX + dx;
-            const checkY = tileY + dy;
-            if (this.isValidPosition(checkX, checkY)) {
-              this.gameState.player.position.x = checkX * 32 + 16;
-              this.gameState.player.position.y = checkY * 32 + 16;
-              break;
+      // Find nearest walkable tile in a spiral pattern
+      let found = false;
+      for (let radius = 1; radius <= 10 && !found; radius++) {
+        for (let dy = -radius; dy <= radius && !found; dy++) {
+          for (let dx = -radius; dx <= radius && !found; dx++) {
+            if (Math.abs(dx) === radius || Math.abs(dy) === radius) { // Only check perimeter
+              const checkX = tileX + dx;
+              const checkY = tileY + dy;
+              if (this.isValidPosition(checkX, checkY)) {
+                this.gameState.player.position.x = checkX * 32 + 16;
+                this.gameState.player.position.y = checkY * 32 + 16;
+                found = true;
+              }
             }
           }
         }
@@ -364,10 +380,10 @@ export class GameEngine {
     // Notify state change
     this.notifyStateChange();
     
-    // Reset transition flag after a longer delay to ensure smooth transition
+    // Reset transition flag after delay
     setTimeout(() => {
       this.isTransitioning = false;
-    }, 300);
+    }, 500);
   }
 
   private isValidPosition(tileX: number, tileY: number): boolean {
