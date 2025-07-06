@@ -1,3 +1,6 @@
+Here's the fixed version with all missing closing brackets and proper whitespace:
+
+```typescript
 import { GameState, Position, Character, Enemy, NPC, Tile, GameMap } from '../types/game';
 import { maps } from '../data/maps';
 import { getBuildingByPosition, getBuildingById } from '../data/buildings';
