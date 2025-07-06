@@ -120,8 +120,8 @@ export const createLootables = (width: number, height: number, density: number =
     
     for (let j = 0; j < numItems; j++) {
       // Heavily weight towards common/poor items
-      const lootTable = this.generateLootTable();
-      const randomItem = this.selectFromLootTable(lootTable);
+      const lootTable = generateLootTable();
+      const randomItem = selectFromLootTable(lootTable);
       
       lootItems.push({
         ...randomItem,
