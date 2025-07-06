@@ -537,7 +537,7 @@ export class GameEngine {
       const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
       
       if (tile?.isExit && this.gameState.previousMap) {
-        // Exit building
+        // Exit building/region - return to exact previous position
         this.gameState.currentMap = this.gameState.previousMap.map;
         this.gameState.player.position = this.gameState.previousMap.position;
         this.gameState.previousMap = undefined;
@@ -549,7 +549,7 @@ export class GameEngine {
       }
     }
     
-    // Check for building entrances
+    // Check for building/region entrances
     const tileX = Math.floor(playerPos.x / 32);
     const tileY = Math.floor(playerPos.y / 32);
     const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
@@ -595,7 +595,13 @@ export class GameEngine {
       );
       
       if (distance < 64 && !lootable.looted) {
-        if (this.lootableCallback) {
+    // Place player at the exit tile (which serves as entrance from inside)
+    const exitTileX = Math.floor(interiorMap.width / 2);
+    const exitTileY = interiorMap.height - 1;
+    this.gameState.player.position = { 
+      x: exitTileX * 32 + 16, 
+      y: exitTileY * 32 + 16 
+    };
           this.lootableCallback(lootable);
           this.updateQuestProgress('first_steps', 'collect_items');
         }
@@ -606,15 +612,21 @@ export class GameEngine {
 
   private startDialogue(npcId: string) {
     const npc = this.gameState.currentMap.npcs.find(n => n.id === npcId);
-    if (!npc || npc.dialogue.length === 0) return;
+    // Store the current map and EXACT position where player entered
 
-    this.gameState.dialogue = {
+    // Store the current map and EXACT position where player entered
       npcId,
       currentNode: npc.dialogue[0].id,
       history: [`${npc.name}: ${npc.dialogue[0].text}`],
       choices: npc.dialogue[0].choices
     };
-    this.gameState.gameMode = 'dialogue';
+    // Place player at the exit tile (which serves as entrance from inside)
+    const exitTileX = Math.floor(regionMap.width / 2);
+    const exitTileY = regionMap.height - 1;
+    this.gameState.player.position = { 
+      x: exitTileX * 32 + 16, 
+      y: exitTileY * 32 + 16 
+    };
     this.notifyStateChange();
   }
 
@@ -644,7 +656,9 @@ export class GameEngine {
 
     // Create simple battlefield
     const battleground: Tile[][] = [];
-    for (let y = 0; y < 8; y++) {
+          type = 'grass'; // Exit tile - different visual to indicate exit
+          description = 'Exit to outside';
+          isExit = true;
       const row: Tile[] = [];
       for (let x = 0; x < 8; x++) {
         row.push({
@@ -655,8 +669,8 @@ export class GameEngine {
           sprite: 'grass',
           discovered: true,
           visible: true
-        });
-      }
+          description,
+          isExit
       battleground.push(row);
     }
 
@@ -1155,6 +1169,7 @@ export class GameEngine {
         const tileX = x * 32 + 16;
         const tileY = y * 32 + 16;
         const distance = Math.sqrt(
+        let isExit = false;
           Math.pow(player.position.x - tileX, 2) + Math.pow(player.position.y - tileY, 2)
         );
 
@@ -1246,6 +1261,16 @@ export class GameEngine {
             this.ctx.textAlign = 'center';
             this.ctx.fillText(name, screenX + 16, screenY - 5);
           }
+        }
+        
+        // Mark exits with a different color
+        if (tile.isExit) {
+          this.ctx.fillStyle = '#00ff00';
+          this.ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.font = '12px Arial';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('EXIT', screenX + 16, screenY + 18);
         }
       }
     }
@@ -1422,10 +1447,12 @@ export class GameEngine {
   }
 
   private update(deltaTime: number) {
-    this.updateMovement(deltaTime);
+        // Create exit at bottom center
     
     // Update game time
-    this.gameState.gameTime += deltaTime;
+          type = 'grass'; // Always grass for exit visibility
+          description = 'Exit to surface';
+          isExit = true;
     this.gameState.statistics.playtime += deltaTime;
     
     // Update day/night cycle
@@ -1437,7 +1464,7 @@ export class GameEngine {
       this.stateChangeCallback(this.getGameState());
     }
   }
-
+          isExit
   public destroy() {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
