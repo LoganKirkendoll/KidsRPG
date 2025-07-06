@@ -1,5 +1,5 @@
 import { Quest } from '../types/game';
-import { items } from './gameData';
+import { items } from './items_data';
 
 export const mainQuests: Quest[] = [
   {

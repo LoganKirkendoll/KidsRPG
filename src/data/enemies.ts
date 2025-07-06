@@ -1,5 +1,6 @@
 import { Enemy } from '../types/game';
-import { items, skills } from './gameData';
+import { items } from './items_data';
+import { skills } from './gameData';
 
 export const enemies: Enemy[] = [
   // CAPITAL WASTELAND ENEMIES

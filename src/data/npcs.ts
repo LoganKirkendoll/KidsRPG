@@ -1,5 +1,5 @@
 import { NPC, DialogueNode } from '../types/game';
-import { items } from './gameData';
+import { items } from './items_data';
 
 export const npcs: NPC[] = [
   // CAPITAL WASTELAND NPCs
