@@ -93,6 +93,10 @@ export const useGameState = () => {
       },
       visibilityMap: [],
       quests: [allQuests.find(q => q.id === 'escape_vault_101')!], // Start with the escape quest
+      
+      // Initialize visibility map for starting map
+      visibilityMap: Array(startingMap.height).fill(null).map(() => Array(startingMap.width).fill(false)),
+      
       devMode: {
         enabled: false,
         selectedTool: 'quest',
