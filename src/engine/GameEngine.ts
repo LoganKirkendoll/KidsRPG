@@ -759,6 +759,13 @@ export class GameEngine {
   private renderTiles() {
     for (let y = this.renderBounds.startY; y < this.renderBounds.endY; y++) {
       for (let x = this.renderBounds.startX; x < this.renderBounds.endX; x++) {
+        // Ensure we don't access out-of-bounds tiles
+        if (y < 0 || y >= this.gameState.currentMap.tiles.length || 
+            x < 0 || !this.gameState.currentMap.tiles[y] || 
+            x >= this.gameState.currentMap.tiles[y].length) {
+          continue;
+        }
+        
         const tile = this.gameState.currentMap.tiles[y][x];
         if (!tile.discovered) continue;
 
