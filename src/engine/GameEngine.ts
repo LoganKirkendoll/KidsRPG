@@ -196,7 +196,6 @@ export class GameEngine {
 
   private updatePlayerMovement(deltaTime: number) {
     if (this.gameState.gameMode !== 'exploration') return;
-    if (this.isTransitioning) return; // Prevent movement during transitions
 
     const speed = 128; // pixels per second
     const moveDistance = speed * (deltaTime / 1000);
@@ -232,12 +231,8 @@ export class GameEngine {
       const mapWidth = this.gameState.currentMap.width * 32;
       const mapHeight = this.gameState.currentMap.height * 32;
       
-      // Add buffer zone to prevent edge flickering
-      const edgeBuffer = 16;
-      
       // Check for map transitions
-      if (newX < -edgeBuffer || newX >= mapWidth + edgeBuffer || 
-          newY < -edgeBuffer || newY >= mapHeight + edgeBuffer) {
+      if (newX < -16 || newX >= mapWidth + 16 || newY < -16 || newY >= mapHeight + 16) {
         this.handleMapTransition(newX, newY, mapWidth, mapHeight);
         return;
       }
@@ -271,12 +266,14 @@ export class GameEngine {
     this.isTransitioning = true;
     
     let direction: 'north' | 'south' | 'east' | 'west' | null = null;
-    let targetPosition: Position | null = null;
     
-    if (newX < 0) direction = 'west';
-    else if (newX >= mapWidth) direction = 'east';
-    else if (newY < 0) direction = 'north';
-    else if (newY >= mapHeight) direction = 'south';
+    // Use a smaller buffer for transition detection
+    const transitionBuffer = 8;
+    
+    if (newX < -transitionBuffer) direction = 'west';
+    else if (newX >= mapWidth + transitionBuffer) direction = 'east';
+    else if (newY < -transitionBuffer) direction = 'north';
+    else if (newY >= mapHeight + transitionBuffer) direction = 'south';
     
     if (!direction) return;
     
@@ -302,24 +299,22 @@ export class GameEngine {
     }
     
     // Calculate proper target position based on direction
+    let targetPosition: Position;
     switch (direction) {
       case 'north':
-        targetPosition = { x: connection.toPosition.x, y: (targetMap.height - 2) * 32 };
+        targetPosition = { x: connection.toPosition.x, y: (targetMap.height - 3) * 32 };
         break;
       case 'south':
-        targetPosition = { x: connection.toPosition.x, y: 32 };
+        targetPosition = { x: connection.toPosition.x, y: 2 * 32 };
         break;
       case 'east':
-        targetPosition = { x: 32, y: connection.toPosition.y };
+        targetPosition = { x: 2 * 32, y: connection.toPosition.y };
         break;
       case 'west':
-        targetPosition = { x: (targetMap.width - 2) * 32, y: connection.toPosition.y };
+        targetPosition = { x: (targetMap.width - 3) * 32, y: connection.toPosition.y };
         break;
-    }
-    
-    if (!targetPosition) {
-      this.isTransitioning = false;
-      return;
+      default:
+        targetPosition = { ...connection.toPosition };
     }
     
     // Unload previous map to save memory (keep only current and adjacent)
@@ -333,6 +328,9 @@ export class GameEngine {
     // Switch to new map
     this.gameState.currentMap = targetMap;
     
+    // Update available maps to include the new map
+    this.gameState.availableMaps[connection.targetMapId] = targetMap;
+    
     // Set player position with proper offset from edge
     this.gameState.player.position = { ...targetPosition };
     
@@ -342,7 +340,7 @@ export class GameEngine {
     
     if (!this.isValidPosition(tileX, tileY)) {
       // Find nearest walkable tile
-      for (let radius = 1; radius <= 5; radius++) {
+      for (let radius = 1; radius <= 10; radius++) {
         for (let dy = -radius; dy <= radius; dy++) {
           for (let dx = -radius; dx <= radius; dx++) {
             const checkX = tileX + dx;
@@ -352,6 +350,9 @@ export class GameEngine {
               this.gameState.player.position.y = checkY * 32 + 16;
               break;
             }
+            if (this.isValidPosition(checkX, checkY)) break;
+          }
+          if (this.isValidPosition(tileX + dx, tileY + dy)) break;
           }
         }
       }
@@ -364,10 +365,10 @@ export class GameEngine {
     // Notify state change
     this.notifyStateChange();
     
-    // Reset transition flag after a longer delay to ensure smooth transition
+    // Reset transition flag after a delay to ensure smooth transition
     setTimeout(() => {
       this.isTransitioning = false;
-    }, 300);
+    }, 200);
   }
 
   private isValidPosition(tileX: number, tileY: number): boolean {
