@@ -39,6 +39,69 @@ export const createBuilding = (tiles: Tile[][], x: number, y: number, width: num
   }
 };
 
+// Create a path between two points
+const createPath = (tiles: Tile[][], startX: number, startY: number, endX: number, endY: number, pathType: string = 'dirt') => {
+  const width = tiles[0].length;
+  const height = tiles.length;
+  
+  let currentX = startX;
+  let currentY = startY;
+  
+  // Create L-shaped path (horizontal first, then vertical)
+  while (currentX !== endX) {
+    if (currentX >= 0 && currentX < width && currentY >= 0 && currentY < height) {
+      if (tiles[currentY][currentX].type !== 'building' && tiles[currentY][currentX].type !== 'water') {
+        tiles[currentY][currentX] = createTile(currentX, currentY, pathType, true);
+      }
+    }
+    currentX += currentX < endX ? 1 : -1;
+  }
+  
+  while (currentY !== endY) {
+    if (currentX >= 0 && currentX < width && currentY >= 0 && currentY < height) {
+      if (tiles[currentY][currentX].type !== 'building' && tiles[currentY][currentX].type !== 'water') {
+        tiles[currentY][currentX] = createTile(currentX, currentY, pathType, true);
+      }
+    }
+    currentY += currentY < endY ? 1 : -1;
+  }
+};
+
+// Create a main road across the map
+const createMainRoad = (tiles: Tile[][], direction: 'horizontal' | 'vertical', position: number, roadType: string = 'stone') => {
+  const width = tiles[0].length;
+  const height = tiles.length;
+  
+  if (direction === 'horizontal' && position >= 0 && position < height) {
+    for (let x = 0; x < width; x++) {
+      if (tiles[position][x].type !== 'building' && tiles[position][x].type !== 'water') {
+        tiles[position][x] = createTile(x, position, roadType, true);
+      }
+    }
+  } else if (direction === 'vertical' && position >= 0 && position < width) {
+    for (let y = 0; y < height; y++) {
+      if (tiles[y][position].type !== 'building' && tiles[y][position].type !== 'water') {
+        tiles[y][position] = createTile(position, y, roadType, true);
+      }
+    }
+  }
+};
+
+// Create area around building with appropriate terrain
+const createBuildingArea = (tiles: Tile[][], centerX: number, centerY: number, radius: number, terrainType: string) => {
+  const width = tiles[0].length;
+  const height = tiles.length;
+  
+  for (let y = Math.max(0, centerY - radius); y <= Math.min(height - 1, centerY + radius); y++) {
+    for (let x = Math.max(0, centerX - radius); x <= Math.min(width - 1, centerX + radius); x++) {
+      const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+      if (distance <= radius && tiles[y][x].type !== 'building' && tiles[y][x].type !== 'water') {
+        tiles[y][x] = createTile(x, y, terrainType, true);
+      }
+    }
+  }
+};
+
 export const createLootables = (width: number, height: number, density: number = 0.02): LootableItem[] => {
   const lootables: LootableItem[] = [];
   const count = Math.floor(width * height * density);
@@ -75,34 +138,85 @@ export const createLootables = (width: number, height: number, density: number =
   return lootables;
 };
 
-// CAPITAL WASTELAND - Starting area (reduced size)
+// CAPITAL WASTELAND - Starting area with proper paths
 export const createCapitalWasteland = (): GameMap => {
   const width = 60;
   const height = 60;
   const tiles: Tile[][] = [];
   
-  // Generate base terrain
+  // Initialize with grass as base terrain
   for (let y = 0; y < height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x++) {
-      const random = Math.random();
-      let type = 'grass';
-      let walkable = true;
-      
-      if (random < 0.3) type = 'dirt';
-      else if (random < 0.4) type = 'stone';
-      else if (random < 0.45) type = 'ruins';
-      else if (random < 0.48) { type = 'water'; walkable = false; }
-      
-      row.push(createTile(x, y, type, walkable));
+      row.push(createTile(x, y, 'grass', true));
     }
     tiles.push(row);
   }
   
-  // Create settlements and buildings
-  createBuilding(tiles, 15, 15, 8, 6, 'vault', 'Vault 101');
-  createBuilding(tiles, 40, 20, 6, 4, 'settlement', 'Megaton');
-  createBuilding(tiles, 25, 45, 5, 4, 'trader_post', 'Craterside Supply');
+  // Add some natural variation
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const random = Math.random();
+      if (random < 0.15) {
+        tiles[y][x] = createTile(x, y, 'dirt', true);
+      } else if (random < 0.2) {
+        tiles[y][x] = createTile(x, y, 'stone', true);
+      }
+    }
+  }
+  
+  // Add water features (small ponds)
+  const waterAreas = [
+    { x: 10, y: 10, radius: 3 },
+    { x: 45, y: 35, radius: 2 },
+    { x: 25, y: 50, radius: 2 }
+  ];
+  
+  waterAreas.forEach(area => {
+    for (let y = Math.max(0, area.y - area.radius); y <= Math.min(height - 1, area.y + area.radius); y++) {
+      for (let x = Math.max(0, area.x - area.radius); x <= Math.min(width - 1, area.x + area.radius); x++) {
+        const distance = Math.sqrt((x - area.x) ** 2 + (y - area.y) ** 2);
+        if (distance <= area.radius) {
+          tiles[y][x] = createTile(x, y, 'water', false);
+        }
+      }
+    }
+  });
+  
+  // Create main roads
+  createMainRoad(tiles, 'horizontal', 30, 'stone'); // Main east-west road
+  createMainRoad(tiles, 'vertical', 30, 'stone');   // Main north-south road
+  
+  // Create buildings with proper areas
+  const buildings = [
+    { x: 15, y: 15, width: 8, height: 6, type: 'vault', name: 'Vault 101' },
+    { x: 40, y: 20, width: 6, height: 4, type: 'settlement', name: 'Megaton' },
+    { x: 25, y: 45, width: 5, height: 4, type: 'trader_post', name: 'Craterside Supply' }
+  ];
+  
+  buildings.forEach(building => {
+    // Create building area with dirt/stone
+    createBuildingArea(tiles, building.x + Math.floor(building.width / 2), building.y + Math.floor(building.height / 2), 8, 'dirt');
+    
+    // Create the building
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+    
+    // Connect to main roads
+    const buildingCenterX = building.x + Math.floor(building.width / 2);
+    const buildingCenterY = building.y + Math.floor(building.height / 2);
+    createPath(tiles, buildingCenterX, buildingCenterY, 30, 30, 'dirt');
+  });
+  
+  // Add some ruins scattered around
+  const ruinAreas = [
+    { x: 5, y: 25, radius: 4 },
+    { x: 50, y: 10, radius: 3 },
+    { x: 35, y: 50, radius: 3 }
+  ];
+  
+  ruinAreas.forEach(area => {
+    createBuildingArea(tiles, area.x, area.y, area.radius, 'ruins');
+  });
   
   const connections: MapConnection[] = [
     {
@@ -145,33 +259,65 @@ export const createCapitalWasteland = (): GameMap => {
   };
 };
 
-// NORTHERN WASTELAND - Industrial area
+// NORTHERN WASTELAND - Industrial area with proper road network
 export const createNorthernWasteland = (): GameMap => {
   const width = 60;
   const height = 60;
   const tiles: Tile[][] = [];
   
+  // Initialize with dirt as base (industrial wasteland)
   for (let y = 0; y < height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x++) {
-      const random = Math.random();
-      let type = 'dirt';
-      let walkable = true;
-      
-      if (random < 0.2) type = 'ruins';
-      else if (random < 0.3) type = 'stone';
-      else if (random < 0.35) { type = 'water'; walkable = false; }
-      else if (random < 0.4) type = 'building';
-      
-      row.push(createTile(x, y, type, walkable));
+      row.push(createTile(x, y, 'dirt', true));
     }
     tiles.push(row);
   }
   
-  // Industrial buildings
-  createBuilding(tiles, 20, 20, 12, 8, 'factory', 'Old Factory');
-  createBuilding(tiles, 40, 35, 8, 6, 'power_plant', 'Power Station');
-  createBuilding(tiles, 10, 45, 6, 4, 'warehouse', 'Supply Depot');
+  // Add industrial terrain variation
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const random = Math.random();
+      if (random < 0.3) {
+        tiles[y][x] = createTile(x, y, 'stone', true);
+      } else if (random < 0.4) {
+        tiles[y][x] = createTile(x, y, 'ruins', true);
+      }
+    }
+  }
+  
+  // Create industrial road network
+  createMainRoad(tiles, 'horizontal', 20, 'stone');
+  createMainRoad(tiles, 'horizontal', 40, 'stone');
+  createMainRoad(tiles, 'vertical', 25, 'stone');
+  createMainRoad(tiles, 'vertical', 45, 'stone');
+  
+  // Industrial buildings with proper connections
+  const buildings = [
+    { x: 20, y: 20, width: 12, height: 8, type: 'factory', name: 'Old Factory' },
+    { x: 40, y: 35, width: 8, height: 6, type: 'power_plant', name: 'Power Station' },
+    { x: 10, y: 45, width: 6, height: 4, type: 'warehouse', name: 'Supply Depot' }
+  ];
+  
+  buildings.forEach(building => {
+    // Create industrial area around building
+    createBuildingArea(tiles, building.x + Math.floor(building.width / 2), building.y + Math.floor(building.height / 2), 6, 'stone');
+    
+    // Create the building
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+    
+    // Connect to nearest main road
+    const buildingCenterX = building.x + Math.floor(building.width / 2);
+    const buildingCenterY = building.y + Math.floor(building.height / 2);
+    
+    // Find nearest road
+    let nearestRoadY = 20;
+    if (Math.abs(buildingCenterY - 40) < Math.abs(buildingCenterY - 20)) {
+      nearestRoadY = 40;
+    }
+    
+    createPath(tiles, buildingCenterX, buildingCenterY, buildingCenterX, nearestRoadY, 'stone');
+  });
   
   const connections: MapConnection[] = [
     {
@@ -202,34 +348,57 @@ export const createNorthernWasteland = (): GameMap => {
   };
 };
 
-// SOUTHERN RUINS - Urban decay
+// SOUTHERN RUINS - Urban decay with street grid
 export const createSouthernRuins = (): GameMap => {
   const width = 60;
   const height = 60;
   const tiles: Tile[][] = [];
   
+  // Initialize with ruins as base
   for (let y = 0; y < height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x++) {
-      const random = Math.random();
-      let type = 'ruins';
-      let walkable = true;
-      
-      if (random < 0.3) type = 'building';
-      else if (random < 0.4) type = 'stone';
-      else if (random < 0.5) type = 'dirt';
-      
-      if (type === 'building' && Math.random() < 0.7) walkable = false;
-      
-      row.push(createTile(x, y, type, walkable));
+      row.push(createTile(x, y, 'ruins', true));
     }
     tiles.push(row);
   }
   
-  // Urban ruins
-  createBuilding(tiles, 15, 15, 10, 8, 'city_hall', 'Ruined City Hall');
-  createBuilding(tiles, 35, 25, 8, 6, 'hospital', 'Abandoned Hospital');
-  createBuilding(tiles, 45, 45, 6, 4, 'school', 'Old School');
+  // Create city street grid
+  for (let i = 10; i < width; i += 10) {
+    createMainRoad(tiles, 'vertical', i, 'stone');
+  }
+  for (let i = 10; i < height; i += 10) {
+    createMainRoad(tiles, 'horizontal', i, 'stone');
+  }
+  
+  // Add building variation
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (tiles[y][x].type === 'ruins') {
+        const random = Math.random();
+        if (random < 0.2) {
+          tiles[y][x] = createTile(x, y, 'dirt', true);
+        } else if (random < 0.3) {
+          tiles[y][x] = createTile(x, y, 'stone', true);
+        }
+      }
+    }
+  }
+  
+  // Urban buildings
+  const buildings = [
+    { x: 15, y: 15, width: 10, height: 8, type: 'city_hall', name: 'Ruined City Hall' },
+    { x: 35, y: 25, width: 8, height: 6, type: 'hospital', name: 'Abandoned Hospital' },
+    { x: 45, y: 45, width: 6, height: 4, type: 'school', name: 'Old School' }
+  ];
+  
+  buildings.forEach(building => {
+    // Create urban area around building
+    createBuildingArea(tiles, building.x + Math.floor(building.width / 2), building.y + Math.floor(building.height / 2), 5, 'stone');
+    
+    // Create the building
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+  });
   
   const connections: MapConnection[] = [
     {
@@ -260,34 +429,56 @@ export const createSouthernRuins = (): GameMap => {
   };
 };
 
-// EASTERN DISTRICTS - Commercial area
+// EASTERN DISTRICTS - Commercial area with organized layout
 export const createEasternDistricts = (): GameMap => {
   const width = 60;
   const height = 60;
   const tiles: Tile[][] = [];
   
+  // Initialize with stone as base (developed area)
   for (let y = 0; y < height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x++) {
-      const random = Math.random();
-      let type = 'stone';
-      let walkable = true;
-      
-      if (random < 0.3) type = 'building';
-      else if (random < 0.4) type = 'ruins';
-      else if (random < 0.5) type = 'grass';
-      
-      if (type === 'building' && Math.random() < 0.6) walkable = false;
-      
-      row.push(createTile(x, y, type, walkable));
+      row.push(createTile(x, y, 'stone', true));
     }
     tiles.push(row);
   }
   
+  // Add some variation
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const random = Math.random();
+      if (random < 0.2) {
+        tiles[y][x] = createTile(x, y, 'dirt', true);
+      } else if (random < 0.3) {
+        tiles[y][x] = createTile(x, y, 'grass', true);
+      }
+    }
+  }
+  
+  // Create main commercial boulevards
+  createMainRoad(tiles, 'horizontal', 30, 'stone');
+  createMainRoad(tiles, 'vertical', 30, 'stone');
+  
   // Commercial buildings
-  createBuilding(tiles, 20, 20, 15, 10, 'rivet_city', 'Rivet City');
-  createBuilding(tiles, 10, 40, 8, 6, 'market', 'Trading Post');
-  createBuilding(tiles, 45, 15, 6, 4, 'clinic', 'Medical Center');
+  const buildings = [
+    { x: 20, y: 20, width: 15, height: 10, type: 'rivet_city', name: 'Rivet City' },
+    { x: 10, y: 40, width: 8, height: 6, type: 'market', name: 'Trading Post' },
+    { x: 45, y: 15, width: 6, height: 4, type: 'clinic', name: 'Medical Center' }
+  ];
+  
+  buildings.forEach(building => {
+    // Create developed area around building
+    createBuildingArea(tiles, building.x + Math.floor(building.width / 2), building.y + Math.floor(building.height / 2), 8, 'stone');
+    
+    // Create the building
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+    
+    // Connect to main roads
+    const buildingCenterX = building.x + Math.floor(building.width / 2);
+    const buildingCenterY = building.y + Math.floor(building.height / 2);
+    createPath(tiles, buildingCenterX, buildingCenterY, 30, 30, 'stone');
+  });
   
   const connections: MapConnection[] = [
     {
@@ -318,33 +509,72 @@ export const createEasternDistricts = (): GameMap => {
   };
 };
 
-// WESTERN OUTSKIRTS - Wilderness
+// WESTERN OUTSKIRTS - Wilderness with natural paths
 export const createWesternOutskirts = (): GameMap => {
   const width = 60;
   const height = 60;
   const tiles: Tile[][] = [];
   
+  // Initialize with grass as base
   for (let y = 0; y < height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x++) {
-      const random = Math.random();
-      let type = 'grass';
-      let walkable = true;
-      
-      if (random < 0.4) type = 'dirt';
-      else if (random < 0.5) type = 'stone';
-      else if (random < 0.55) { type = 'water'; walkable = false; }
-      else if (random < 0.6) type = 'ruins';
-      
-      row.push(createTile(x, y, type, walkable));
+      row.push(createTile(x, y, 'grass', true));
     }
     tiles.push(row);
   }
   
+  // Add natural terrain variation
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const random = Math.random();
+      if (random < 0.3) {
+        tiles[y][x] = createTile(x, y, 'dirt', true);
+      } else if (random < 0.4) {
+        tiles[y][x] = createTile(x, y, 'stone', true);
+      }
+    }
+  }
+  
+  // Add water features
+  const waterAreas = [
+    { x: 20, y: 15, radius: 4 },
+    { x: 45, y: 40, radius: 3 }
+  ];
+  
+  waterAreas.forEach(area => {
+    for (let y = Math.max(0, area.y - area.radius); y <= Math.min(height - 1, area.y + area.radius); y++) {
+      for (let x = Math.max(0, area.x - area.radius); x <= Math.min(width - 1, area.x + area.radius); x++) {
+        const distance = Math.sqrt((x - area.x) ** 2 + (y - area.y) ** 2);
+        if (distance <= area.radius) {
+          tiles[y][x] = createTile(x, y, 'water', false);
+        }
+      }
+    }
+  });
+  
+  // Create natural trail
+  createPath(tiles, 0, 30, 59, 30, 'dirt');
+  
   // Wilderness outposts
-  createBuilding(tiles, 15, 25, 6, 4, 'ranger_station', 'Ranger Outpost');
-  createBuilding(tiles, 40, 35, 5, 3, 'cabin', 'Survivor\'s Cabin');
-  createBuilding(tiles, 25, 50, 4, 3, 'bunker', 'Hidden Bunker');
+  const buildings = [
+    { x: 15, y: 25, width: 6, height: 4, type: 'ranger_station', name: 'Ranger Outpost' },
+    { x: 40, y: 35, width: 5, height: 3, type: 'cabin', name: 'Survivor\'s Cabin' },
+    { x: 25, y: 50, width: 4, height: 3, type: 'bunker', name: 'Hidden Bunker' }
+  ];
+  
+  buildings.forEach(building => {
+    // Create cleared area around building
+    createBuildingArea(tiles, building.x + Math.floor(building.width / 2), building.y + Math.floor(building.height / 2), 4, 'dirt');
+    
+    // Create the building
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+    
+    // Connect to main trail
+    const buildingCenterX = building.x + Math.floor(building.width / 2);
+    const buildingCenterY = building.y + Math.floor(building.height / 2);
+    createPath(tiles, buildingCenterX, buildingCenterY, buildingCenterX, 30, 'dirt');
+  });
   
   const connections: MapConnection[] = [
     {
@@ -375,32 +605,50 @@ export const createWesternOutskirts = (): GameMap => {
   };
 };
 
-// THE PITT - Industrial wasteland (smaller)
+// THE PITT - Industrial wasteland with proper layout
 export const createThePitt = (): GameMap => {
   const width = 50;
   const height = 40;
   const tiles: Tile[][] = [];
   
+  // Initialize with dirt/ruins
   for (let y = 0; y < height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x++) {
-      const random = Math.random();
-      let type = 'dirt';
-      let walkable = true;
-      
-      if (random < 0.2) type = 'ruins';
-      else if (random < 0.3) type = 'stone';
-      else if (random < 0.35) { type = 'lava'; walkable = false; }
-      else if (random < 0.4) type = 'building';
-      
-      row.push(createTile(x, y, type, walkable));
+      row.push(createTile(x, y, 'dirt', true));
     }
     tiles.push(row);
   }
   
+  // Add industrial terrain
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const random = Math.random();
+      if (random < 0.4) {
+        tiles[y][x] = createTile(x, y, 'ruins', true);
+      } else if (random < 0.5) {
+        tiles[y][x] = createTile(x, y, 'stone', true);
+      }
+    }
+  }
+  
+  // Create main industrial road
+  createMainRoad(tiles, 'horizontal', 20, 'stone');
+  
   // Industrial buildings
-  createBuilding(tiles, 15, 15, 8, 6, 'steel_mill', 'The Mill');
-  createBuilding(tiles, 30, 20, 6, 4, 'slave_quarters', 'Worker Barracks');
+  const buildings = [
+    { x: 15, y: 15, width: 8, height: 6, type: 'steel_mill', name: 'The Mill' },
+    { x: 30, y: 20, width: 6, height: 4, type: 'slave_quarters', name: 'Worker Barracks' }
+  ];
+  
+  buildings.forEach(building => {
+    createBuildingArea(tiles, building.x + Math.floor(building.width / 2), building.y + Math.floor(building.height / 2), 5, 'stone');
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+    
+    // Connect to main road
+    const buildingCenterX = building.x + Math.floor(building.width / 2);
+    createPath(tiles, buildingCenterX, building.y + building.height, buildingCenterX, 20, 'stone');
+  });
   
   const connections: MapConnection[] = [
     {
@@ -425,33 +673,54 @@ export const createThePitt = (): GameMap => {
   };
 };
 
-// POINT LOOKOUT - Swampland (smaller)
+// POINT LOOKOUT - Swampland with boardwalks
 export const createPointLookout = (): GameMap => {
   const width = 45;
   const height = 45;
   const tiles: Tile[][] = [];
   
+  // Initialize with grass/water mix
   for (let y = 0; y < height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x++) {
       const random = Math.random();
-      let type = 'grass';
-      let walkable = true;
-      
-      if (random < 0.4) type = 'water';
-      else if (random < 0.5) type = 'dirt';
-      else if (random < 0.6) type = 'ruins';
-      
-      if (type === 'water' && Math.random() < 0.7) walkable = false;
-      
-      row.push(createTile(x, y, type, walkable));
+      if (random < 0.4) {
+        row.push(createTile(x, y, 'water', false));
+      } else {
+        row.push(createTile(x, y, 'grass', true));
+      }
     }
     tiles.push(row);
   }
   
+  // Create boardwalk paths over water
+  createMainRoad(tiles, 'horizontal', 22, 'stone');
+  createMainRoad(tiles, 'vertical', 22, 'stone');
+  
+  // Make boardwalks walkable even over water
+  for (let x = 0; x < width; x++) {
+    tiles[22][x].walkable = true;
+  }
+  for (let y = 0; y < height; y++) {
+    tiles[y][22].walkable = true;
+  }
+  
   // Swamp settlements
-  createBuilding(tiles, 15, 15, 6, 4, 'mansion', 'Calvert Mansion');
-  createBuilding(tiles, 30, 25, 4, 3, 'lighthouse', 'Point Lookout Lighthouse');
+  const buildings = [
+    { x: 15, y: 15, width: 6, height: 4, type: 'mansion', name: 'Calvert Mansion' },
+    { x: 30, y: 25, width: 4, height: 3, type: 'lighthouse', name: 'Point Lookout Lighthouse' }
+  ];
+  
+  buildings.forEach(building => {
+    // Create dry land around buildings
+    createBuildingArea(tiles, building.x + Math.floor(building.width / 2), building.y + Math.floor(building.height / 2), 3, 'dirt');
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+    
+    // Connect to boardwalks
+    const buildingCenterX = building.x + Math.floor(building.width / 2);
+    const buildingCenterY = building.y + Math.floor(building.height / 2);
+    createPath(tiles, buildingCenterX, buildingCenterY, 22, 22, 'stone');
+  });
   
   const connections: MapConnection[] = [
     {
@@ -476,29 +745,39 @@ export const createPointLookout = (): GameMap => {
   };
 };
 
-// CITADEL - Brotherhood stronghold (smaller)
+// CITADEL - Brotherhood stronghold with organized layout
 export const createCitadel = (): GameMap => {
   const width = 40;
   const height = 40;
   const tiles: Tile[][] = [];
   
+  // Initialize with stone (military base)
   for (let y = 0; y < height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x++) {
-      const random = Math.random();
-      let type = 'stone';
-      
-      if (random < 0.3) type = 'building';
-      else if (random < 0.4) type = 'ruins';
-      
-      row.push(createTile(x, y, type, true));
+      row.push(createTile(x, y, 'stone', true));
     }
     tiles.push(row);
   }
   
+  // Create organized military layout
+  createMainRoad(tiles, 'horizontal', 20, 'stone');
+  createMainRoad(tiles, 'vertical', 20, 'stone');
+  
   // Brotherhood facilities
-  createBuilding(tiles, 15, 15, 10, 8, 'citadel', 'The Citadel');
-  createBuilding(tiles, 5, 5, 6, 4, 'armory', 'Brotherhood Armory');
+  const buildings = [
+    { x: 15, y: 15, width: 10, height: 8, type: 'citadel', name: 'The Citadel' },
+    { x: 5, y: 5, width: 6, height: 4, type: 'armory', name: 'Brotherhood Armory' }
+  ];
+  
+  buildings.forEach(building => {
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+    
+    // Connect to main roads
+    const buildingCenterX = building.x + Math.floor(building.width / 2);
+    const buildingCenterY = building.y + Math.floor(building.height / 2);
+    createPath(tiles, buildingCenterX, buildingCenterY, 20, 20, 'stone');
+  });
   
   const connections: MapConnection[] = [
     {
@@ -523,31 +802,48 @@ export const createCitadel = (): GameMap => {
   };
 };
 
-// METRO TUNNELS - Underground system (smaller)
+// METRO TUNNELS - Underground system with rail lines
 export const createMetroTunnels = (): GameMap => {
   const width = 80;
   const height = 25;
   const tiles: Tile[][] = [];
   
+  // Initialize with ruins (underground)
   for (let y = 0; y < height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x++) {
-      const random = Math.random();
-      let type = 'ruins';
-      let walkable = true;
-      
-      if (random < 0.2) { type = 'water'; walkable = false; }
-      else if (random < 0.3) type = 'building';
-      
-      row.push(createTile(x, y, type, walkable));
+      row.push(createTile(x, y, 'ruins', true));
     }
     tiles.push(row);
   }
   
+  // Create main tunnel lines
+  createMainRoad(tiles, 'horizontal', 12, 'stone'); // Main tunnel
+  createMainRoad(tiles, 'horizontal', 8, 'stone');  // Secondary tunnel
+  createMainRoad(tiles, 'horizontal', 16, 'stone'); // Secondary tunnel
+  
+  // Add water hazards
+  for (let x = 30; x < 35; x++) {
+    for (let y = 10; y < 15; y++) {
+      tiles[y][x] = createTile(x, y, 'water', false);
+    }
+  }
+  
   // Metro stations
-  createBuilding(tiles, 15, 10, 6, 4, 'metro_station', 'Dupont Circle Station');
-  createBuilding(tiles, 40, 8, 6, 4, 'metro_station', 'Gallery Place Station');
-  createBuilding(tiles, 65, 12, 6, 4, 'metro_station', 'Union Station');
+  const buildings = [
+    { x: 15, y: 10, width: 6, height: 4, type: 'metro_station', name: 'Dupont Circle Station' },
+    { x: 40, y: 8, width: 6, height: 4, type: 'metro_station', name: 'Gallery Place Station' },
+    { x: 65, y: 12, width: 6, height: 4, type: 'metro_station', name: 'Union Station' }
+  ];
+  
+  buildings.forEach(building => {
+    createBuildingArea(tiles, building.x + Math.floor(building.width / 2), building.y + Math.floor(building.height / 2), 3, 'stone');
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+    
+    // Connect to main tunnel
+    const buildingCenterX = building.x + Math.floor(building.width / 2);
+    createPath(tiles, buildingCenterX, building.y + building.height, buildingCenterX, 12, 'stone');
+  });
   
   const connections: MapConnection[] = [
     {
