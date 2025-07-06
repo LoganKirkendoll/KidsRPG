@@ -147,7 +147,7 @@ export const items: Item[] = [
     rarity: 'common',
     description: 'Useful for crafting and repairs',
     quantity: 1,
-    value: 2,
+    value: 1,
     sprite: 'scrap_metal',
     stackable: true
   },
@@ -158,7 +158,7 @@ export const items: Item[] = [
     rarity: 'uncommon',
     description: 'Complex electronic components',
     quantity: 1,
-    value: 10,
+    value: 8,
     sprite: 'electronics',
     stackable: true
   },
@@ -169,8 +169,76 @@ export const items: Item[] = [
     rarity: 'rare',
     description: 'Precious materials for advanced crafting',
     quantity: 1,
-    value: 50,
+    value: 35,
     sprite: 'rare_earth',
+    stackable: true
+  },
+  
+  // Add more common junk items
+  {
+    id: 'rusty_can',
+    name: 'Rusty Can',
+    type: 'material',
+    rarity: 'common',
+    description: 'An old, rusted tin can. Barely worth anything.',
+    quantity: 1,
+    value: 1,
+    sprite: 'rusty_can',
+    stackable: true
+  },
+  {
+    id: 'broken_glass',
+    name: 'Broken Glass',
+    type: 'material',
+    rarity: 'common',
+    description: 'Shards of broken glass. Handle with care.',
+    quantity: 1,
+    value: 1,
+    sprite: 'broken_glass',
+    stackable: true
+  },
+  {
+    id: 'dirty_water',
+    name: 'Dirty Water',
+    type: 'consumable',
+    rarity: 'common',
+    description: 'Contaminated water. Might make you sick.',
+    quantity: 1,
+    value: 2,
+    sprite: 'dirty_water',
+    stackable: true
+  },
+  {
+    id: 'moldy_food',
+    name: 'Moldy Food',
+    type: 'consumable',
+    rarity: 'common',
+    description: 'Food that has seen better days. Probably not safe to eat.',
+    quantity: 1,
+    value: 1,
+    sprite: 'moldy_food',
+    stackable: true
+  },
+  {
+    id: 'old_newspaper',
+    name: 'Old Newspaper',
+    type: 'material',
+    rarity: 'common',
+    description: 'A yellowed newspaper from before the war. Good for starting fires.',
+    quantity: 1,
+    value: 1,
+    sprite: 'old_newspaper',
+    stackable: true
+  },
+  {
+    id: 'bent_spoon',
+    name: 'Bent Spoon',
+    type: 'material',
+    rarity: 'common',
+    description: 'A twisted piece of cutlery. Might have some scrap value.',
+    quantity: 1,
+    value: 1,
+    sprite: 'bent_spoon',
     stackable: true
   }
 ];

@@ -17,9 +17,10 @@ export const enemies: Enemy[] = [
     damage: 14,
     experience: 20,
     loot: [
-      { item: items.find(i => i.id === 'rusty_pipe')!, chance: 0.4, quantity: 1 },
-      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.7, quantity: 2 },
-      { item: items.find(i => i.id === 'stimpak')!, chance: 0.2, quantity: 1 }
+      { item: items.find(i => i.id === 'rusty_pipe')!, chance: 0.15, quantity: 1 },
+      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.4, quantity: 1 },
+      { item: items.find(i => i.id === 'rusty_can')!, chance: 0.6, quantity: 1 },
+      { item: items.find(i => i.id === 'stimpak')!, chance: 0.05, quantity: 1 }
     ],
     position: { x: 0, y: 0 },
     direction: 'down',
@@ -43,9 +44,10 @@ export const enemies: Enemy[] = [
     damage: 35,
     experience: 80,
     loot: [
-      { item: items.find(i => i.id === 'assault_rifle')!, chance: 0.3, quantity: 1 },
-      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.9, quantity: 5 },
-      { item: items.find(i => i.id === 'rad_away')!, chance: 0.4, quantity: 2 }
+      { item: items.find(i => i.id === 'assault_rifle')!, chance: 0.08, quantity: 1 },
+      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.6, quantity: 2 },
+      { item: items.find(i => i.id === 'electronics')!, chance: 0.3, quantity: 1 },
+      { item: items.find(i => i.id === 'rad_away')!, chance: 0.15, quantity: 1 }
     ],
     position: { x: 0, y: 0 },
     direction: 'down',
@@ -69,9 +71,10 @@ export const enemies: Enemy[] = [
     damage: 45,
     experience: 120,
     loot: [
-      { item: items.find(i => i.id === 'plasma_rifle')!, chance: 0.5, quantity: 1 },
-      { item: items.find(i => i.id === 'power_armor')!, chance: 0.2, quantity: 1 },
-      { item: items.find(i => i.id === 'electronics')!, chance: 0.8, quantity: 3 }
+      { item: items.find(i => i.id === 'plasma_rifle')!, chance: 0.12, quantity: 1 },
+      { item: items.find(i => i.id === 'power_armor')!, chance: 0.03, quantity: 1 },
+      { item: items.find(i => i.id === 'electronics')!, chance: 0.5, quantity: 2 },
+      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.8, quantity: 3 }
     ],
     position: { x: 0, y: 0 },
     direction: 'down',
@@ -95,8 +98,10 @@ export const enemies: Enemy[] = [
     damage: 20,
     experience: 35,
     loot: [
-      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.5, quantity: 1 },
-      { item: items.find(i => i.id === 'rad_away')!, chance: 0.6, quantity: 1 }
+      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.3, quantity: 1 },
+      { item: items.find(i => i.id === 'dirty_water')!, chance: 0.4, quantity: 1 },
+      { item: items.find(i => i.id === 'moldy_food')!, chance: 0.3, quantity: 1 },
+      { item: items.find(i => i.id === 'rad_away')!, chance: 0.1, quantity: 1 }
     ],
     position: { x: 0, y: 0 },
     direction: 'down',
@@ -120,8 +125,9 @@ export const enemies: Enemy[] = [
     damage: 60,
     experience: 200,
     loot: [
-      { item: items.find(i => i.id === 'rare_earth')!, chance: 0.7, quantity: 2 },
-      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.9, quantity: 8 }
+      { item: items.find(i => i.id === 'rare_earth')!, chance: 0.25, quantity: 1 },
+      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.7, quantity: 4 },
+      { item: items.find(i => i.id === 'electronics')!, chance: 0.4, quantity: 2 }
     ],
     position: { x: 0, y: 0 },
     direction: 'down',

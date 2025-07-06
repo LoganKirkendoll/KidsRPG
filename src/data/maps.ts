@@ -102,7 +102,7 @@ const createBuildingArea = (tiles: Tile[][], centerX: number, centerY: number, r
   }
 };
 
-export const createLootables = (width: number, height: number, density: number = 0.02): LootableItem[] => {
+export const createLootables = (width: number, height: number, density: number = 0.005): LootableItem[] => {
   const lootables: LootableItem[] = [];
   const count = Math.floor(width * height * density);
   
@@ -113,14 +113,19 @@ export const createLootables = (width: number, height: number, density: number =
     const lootTypes = ['container', 'corpse', 'cache'];
     const lootType = lootTypes[Math.floor(Math.random() * lootTypes.length)];
     
-    const numItems = Math.floor(Math.random() * 3) + 1;
+    // Most lootables have 1 item, rarely 2, very rarely 3
+    const rand = Math.random();
+    const numItems = rand < 0.7 ? 1 : rand < 0.95 ? 2 : 3;
     const lootItems = [];
     
     for (let j = 0; j < numItems; j++) {
-      const randomItem = items[Math.floor(Math.random() * items.length)];
+      // Heavily weight towards common/poor items
+      const lootTable = this.generateLootTable();
+      const randomItem = this.selectFromLootTable(lootTable);
+      
       lootItems.push({
         ...randomItem,
-        quantity: randomItem.stackable ? Math.floor(Math.random() * 3) + 1 : 1
+        quantity: randomItem.stackable ? (Math.random() < 0.3 ? 2 : 1) : 1
       });
     }
     
@@ -136,6 +141,61 @@ export const createLootables = (width: number, height: number, density: number =
   }
   
   return lootables;
+};
+
+// Generate weighted loot table favoring poor quality items
+const generateLootTable = () => {
+  const commonItems = items.filter(i => i.rarity === 'common');
+  const uncommonItems = items.filter(i => i.rarity === 'uncommon');
+  const rareItems = items.filter(i => i.rarity === 'rare');
+  const epicItems = items.filter(i => i.rarity === 'epic');
+  const legendaryItems = items.filter(i => i.rarity === 'legendary');
+  
+  // Create weighted loot table
+  const lootTable = [];
+  
+  // 70% chance for common items (mostly scrap and basic materials)
+  for (let i = 0; i < 70; i++) {
+    lootTable.push(...commonItems.filter(item => 
+      item.type === 'material' || 
+      (item.type === 'consumable' && item.value <= 20)
+    ));
+  }
+  
+  // 20% chance for slightly better common items
+  for (let i = 0; i < 20; i++) {
+    lootTable.push(...commonItems);
+  }
+  
+  // 7% chance for uncommon items
+  for (let i = 0; i < 7; i++) {
+    lootTable.push(...uncommonItems);
+  }
+  
+  // 2.5% chance for rare items
+  for (let i = 0; i < 2; i++) {
+    lootTable.push(...rareItems);
+  }
+  
+  // 0.4% chance for epic items
+  if (Math.random() < 0.004) {
+    lootTable.push(...epicItems);
+  }
+  
+  // 0.1% chance for legendary items
+  if (Math.random() < 0.001) {
+    lootTable.push(...legendaryItems);
+  }
+  
+  return lootTable;
+};
+
+const selectFromLootTable = (lootTable: any[]) => {
+  if (lootTable.length === 0) {
+    // Fallback to scrap metal if table is empty
+    return items.find(i => i.id === 'scrap_metal') || items[0];
+  }
+  return lootTable[Math.floor(Math.random() * lootTable.length)];
 };
 
 // CAPITAL WASTELAND - Starting area with proper paths
@@ -290,7 +350,7 @@ export const createCapitalWasteland = (): GameMap => {
     bgMusic: 'wasteland_ambient',
     npcs: npcs.filter(npc => !npc.mapId || npc.mapId === 'capital_wasteland'),
     enemies: enemies.filter(enemy => !enemy.mapId || enemy.mapId === 'capital_wasteland'),
-    lootables: createLootables(width, height),
+    lootables: createLootables(width, height, 0.003), // Very rare lootables
     connections
   };
 };
@@ -379,7 +439,7 @@ export const createNorthernWasteland = (): GameMap => {
     bgMusic: 'industrial_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'northern_wasteland'),
     enemies: enemies.filter(enemy => enemy.mapId === 'northern_wasteland'),
-    lootables: createLootables(width, height, 0.03),
+    lootables: createLootables(width, height, 0.008), // Slightly more in industrial areas
     connections
   };
 };
@@ -460,7 +520,7 @@ export const createSouthernRuins = (): GameMap => {
     bgMusic: 'ruins_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'southern_ruins'),
     enemies: enemies.filter(enemy => enemy.mapId === 'southern_ruins'),
-    lootables: createLootables(width, height, 0.04),
+    lootables: createLootables(width, height, 0.006), // Moderate in ruins
     connections
   };
 };
@@ -540,7 +600,7 @@ export const createEasternDistricts = (): GameMap => {
     bgMusic: 'city_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'eastern_districts'),
     enemies: enemies.filter(enemy => enemy.mapId === 'eastern_districts'),
-    lootables: createLootables(width, height, 0.025),
+    lootables: createLootables(width, height, 0.004), // Rare in developed areas
     connections
   };
 };
@@ -636,7 +696,7 @@ export const createWesternOutskirts = (): GameMap => {
     bgMusic: 'wilderness_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'western_outskirts'),
     enemies: enemies.filter(enemy => enemy.mapId === 'western_outskirts'),
-    lootables: createLootables(width, height, 0.02),
+    lootables: createLootables(width, height, 0.002), // Very rare in wilderness
     connections
   };
 };
@@ -704,7 +764,7 @@ export const createThePitt = (): GameMap => {
     bgMusic: 'industrial_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'the_pitt'),
     enemies: enemies.filter(enemy => enemy.mapId === 'the_pitt'),
-    lootables: createLootables(width, height, 0.03),
+    lootables: createLootables(width, height, 0.007), // Industrial scrap
     connections
   };
 };
@@ -776,7 +836,7 @@ export const createPointLookout = (): GameMap => {
     bgMusic: 'swamp_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'point_lookout'),
     enemies: enemies.filter(enemy => enemy.mapId === 'point_lookout'),
-    lootables: createLootables(width, height, 0.025),
+    lootables: createLootables(width, height, 0.003), // Rare in swampland
     connections
   };
 };
@@ -833,7 +893,7 @@ export const createCitadel = (): GameMap => {
     bgMusic: 'brotherhood_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'citadel'),
     enemies: enemies.filter(enemy => enemy.mapId === 'citadel'),
-    lootables: createLootables(width, height, 0.015),
+    lootables: createLootables(width, height, 0.001), // Very rare in military base
     connections
   };
 };
@@ -899,7 +959,7 @@ export const createMetroTunnels = (): GameMap => {
     bgMusic: 'underground_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'metro_tunnels'),
     enemies: enemies.filter(enemy => enemy.mapId === 'metro_tunnels'),
-    lootables: createLootables(width, height, 0.035),
+    lootables: createLootables(width, height, 0.01), // Moderate in abandoned tunnels
     connections
   };
 };
