@@ -595,38 +595,28 @@ export class GameEngine {
       );
       
       if (distance < 64 && !lootable.looted) {
-    // Place player at the exit tile (which serves as entrance from inside)
-    const exitTileX = Math.floor(interiorMap.width / 2);
-    const exitTileY = interiorMap.height - 1;
-    this.gameState.player.position = { 
-      x: exitTileX * 32 + 16, 
-      y: exitTileY * 32 + 16 
-    };
+        if (this.lootableCallback) {
           this.lootableCallback(lootable);
-          this.updateQuestProgress('first_steps', 'collect_items');
         }
+          this.updateQuestProgress('first_steps', 'collect_items');
         return;
+      }
       }
     }
   }
 
   private startDialogue(npcId: string) {
     const npc = this.gameState.currentMap.npcs.find(n => n.id === npcId);
-    // Store the current map and EXACT position where player entered
+    if (!npc) return;
 
-    // Store the current map and EXACT position where player entered
+    this.gameState.dialogue = {
       npcId,
       currentNode: npc.dialogue[0].id,
       history: [`${npc.name}: ${npc.dialogue[0].text}`],
       choices: npc.dialogue[0].choices
     };
-    // Place player at the exit tile (which serves as entrance from inside)
-    const exitTileX = Math.floor(regionMap.width / 2);
-    const exitTileY = regionMap.height - 1;
-    this.gameState.player.position = { 
-      x: exitTileX * 32 + 16, 
-      y: exitTileY * 32 + 16 
-    };
+    
+    this.gameState.gameMode = 'dialogue';
     this.notifyStateChange();
   }
 
