@@ -276,16 +276,18 @@ export class GameEngine {
       for (let x = 0; x < width; x++) {
         let type = 'building';
         let walkable = true;
+        let isExit = false;
         
         // Create walls around the edges
         if (x === 0 || x === width - 1 || y === 0 || y === height - 1) {
           walkable = false;
         }
         
-        // Create entrance at bottom center
-        if (x === Math.floor(width / 2) && y === height - 1) {
+        // Create exit area at bottom center (3 tiles wide)
+        if (x >= Math.floor(width / 2) - 1 && x <= Math.floor(width / 2) + 1 && y >= height - 2) {
           walkable = true;
-          type = 'building'; // Exit tile
+          isExit = true;
+          type = 'grass'; // Different visual for exit
         }
         
         row.push({
@@ -296,8 +298,8 @@ export class GameEngine {
           sprite: type,
           discovered: true,
           visible: true,
-          description: 'Interior floor',
-          isExit: x === Math.floor(width / 2) && y === height - 1
+          description: isExit ? 'Exit to outside' : 'Interior floor',
+          isExit
         });
       }
       tiles.push(row);
@@ -383,6 +385,7 @@ export class GameEngine {
         let type = 'grass';
         let walkable = true;
         let description = 'Unknown terrain';
+        let isExit = false;
         
         // Create walls around the edges for caves and tunnels
         if ((regionType === 'cave' || regionType === 'tunnel') && 
@@ -426,10 +429,12 @@ export class GameEngine {
           }
         }
         
-        // Create entrance at bottom center
-        if (x === Math.floor(width / 2) && y === height - 1) {
+        // Create exit area at bottom center (wider area)
+        if (x >= Math.floor(width / 2) - 2 && x <= Math.floor(width / 2) + 2 && y >= height - 3) {
           walkable = true;
+          isExit = true;
           type = regionType === 'cave' || regionType === 'tunnel' ? 'dirt' : type;
+          description = 'Exit to wasteland';
         }
         
         row.push({
@@ -441,7 +446,7 @@ export class GameEngine {
           discovered: true,
           visible: true,
           description,
-          isExit: x === Math.floor(width / 2) && y === height - 1
+          isExit
         });
       }
       tiles.push(row);
@@ -532,11 +537,30 @@ export class GameEngine {
     
     // Check for exit if in interior
     if (this.gameState.currentMap.isInterior) {
-      const tileX = Math.floor(playerPos.x / 32);
-      const tileY = Math.floor(playerPos.y / 32);
-      const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
+      // Check a wider area around the player for exits
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const checkX = Math.floor((playerPos.x + dx * 16) / 32);
+          const checkY = Math.floor((playerPos.y + dy * 16) / 32);
+          const tile = this.gameState.currentMap.tiles[checkY]?.[checkX];
+          
+          if (tile?.isExit && this.gameState.previousMap) {
+            // Exit building
+            this.gameState.currentMap = this.gameState.previousMap.map;
+            this.gameState.player.position = this.gameState.previousMap.position;
+            this.gameState.previousMap = undefined;
+            
+            this.updateCamera();
+            this.updateVisibility();
+            this.notifyStateChange();
+            return;
+          }
+        }
+      }
       
-      if (tile?.isExit && this.gameState.previousMap) {
+      // Also check if player is near the bottom edge (common exit location)
+      const tileY = Math.floor(playerPos.y / 32);
+      if (tileY >= this.gameState.currentMap.height - 2 && this.gameState.previousMap) {
         // Exit building
         this.gameState.currentMap = this.gameState.previousMap.map;
         this.gameState.player.position = this.gameState.previousMap.position;
@@ -1247,6 +1271,17 @@ export class GameEngine {
             this.ctx.fillText(name, screenX + 16, screenY - 5);
           }
         }
+        
+        // Mark exits in interiors
+        if (tile.isExit && this.gameState.currentMap.isInterior) {
+          this.ctx.fillStyle = '#00ff00';
+          this.ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+          
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.font = '10px Arial';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('EXIT', screenX + 16, screenY + 18);
+        }
       }
     }
   }
@@ -1397,6 +1432,16 @@ export class GameEngine {
     this.ctx.fillStyle = '#ffff00';
     this.ctx.font = '12px Arial';
     this.ctx.fillText(this.gameState.currentMap.name, 15, 147);
+    
+    // Show exit hint when in interior
+    if (this.gameState.currentMap.isInterior) {
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      this.ctx.fillRect(10, 160, 250, 25);
+      
+      this.ctx.fillStyle = '#00ff00';
+      this.ctx.font = '12px Arial';
+      this.ctx.fillText('Press F or Space near green EXIT tiles to leave', 15, 177);
+    }
   }
 
   private darkenColor(color: string, factor: number): string {
