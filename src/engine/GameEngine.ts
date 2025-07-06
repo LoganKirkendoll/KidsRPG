@@ -360,6 +360,12 @@ export class GameEngine {
           type = 'grass'; // Different visual for exit
         }
         
+        // Ensure spawn area is clear (around center, a few tiles up from bottom)
+        if (x >= Math.floor(width / 2) - 2 && x <= Math.floor(width / 2) + 2 && 
+            y >= height - 5 && y <= height - 3) {
+          walkable = true;
+        }
+        
         row.push({
           x,
           y,
@@ -507,6 +513,19 @@ export class GameEngine {
           description = 'Exit to wasteland';
         }
         
+        // Ensure spawn area is clear (around center, a few tiles up from bottom)
+        if (x >= Math.floor(width / 2) - 3 && x <= Math.floor(width / 2) + 3 && 
+            y >= height - 8 && y <= height - 4) {
+          walkable = true;
+          if (regionType === 'cave' || regionType === 'tunnel') {
+            type = 'dirt';
+          } else if (regionType === 'desert') {
+            type = 'sand';
+          } else {
+            type = 'grass';
+          }
+        }
+        
         row.push({
           x,
           y,
@@ -530,8 +549,14 @@ export class GameEngine {
     // Add enemies based on region type
     const enemyCount = Math.floor(Math.random() * 8) + 3;
     for (let i = 0; i < enemyCount; i++) {
-      const x = Math.floor(Math.random() * (width - 4)) + 2;
-      const y = Math.floor(Math.random() * (height - 4)) + 2;
+      // Keep enemies away from spawn area
+      let x, y;
+      let attempts = 0;
+      do {
+        x = Math.floor(Math.random() * (width - 4)) + 2;
+        y = Math.floor(Math.random() * (height - 4)) + 2;
+        attempts++;
+      } while (attempts < 20 && this.isInSpawnArea(x, y, width, height));
       
       if (tiles[y][x].walkable) {
         let enemyTemplate;
@@ -562,8 +587,14 @@ export class GameEngine {
     // Add lootables
     const lootableCount = Math.floor(Math.random() * 6) + 2;
     for (let i = 0; i < lootableCount; i++) {
-      const x = Math.floor(Math.random() * (width - 4)) + 2;
-      const y = Math.floor(Math.random() * (height - 4)) + 2;
+      // Keep lootables away from spawn area
+      let x, y;
+      let attempts = 0;
+      do {
+        x = Math.floor(Math.random() * (width - 4)) + 2;
+        y = Math.floor(Math.random() * (height - 4)) + 2;
+        attempts++;
+      } while (attempts < 20 && this.isInSpawnArea(x, y, width, height));
       
       if (tiles[y][x].walkable) {
         const lootType = Math.random() < 0.4 ? 'corpse' : 'container';
@@ -602,6 +633,15 @@ export class GameEngine {
       isInterior: true
     };
   }
+
+  private isInSpawnArea(x: number, y: number, mapWidth: number, mapHeight: number): boolean {
+    const centerX = Math.floor(mapWidth / 2);
+    const spawnY = mapHeight - 6; // Around where player spawns
+    
+    // Check if position is within spawn safety zone
+    return Math.abs(x - centerX) <= 4 && Math.abs(y - spawnY) <= 3;
+  }
+  
   private handleInteraction() {
     const playerPos = this.gameState.player.position;
     
