@@ -14,6 +14,9 @@ export class GameEngine {
   private loadedMaps: { [key: string]: GameMap } = {};
   private isTransitioning = false;
   private transitionCooldown = 0;
+  private edgeTimer = 0;
+  private isAtEdge = false;
+  private edgeDirection: 'north' | 'south' | 'east' | 'west' | null = null;
 
   constructor(canvas: HTMLCanvasElement, initialGameState: GameState, settings?: any) {
     this.canvas = canvas;
@@ -238,12 +241,37 @@ export class GameEngine {
       const mapWidth = this.gameState.currentMap.width * 32;
       const mapHeight = this.gameState.currentMap.height * 32;
       
-      // Check for map transitions with proper boundaries
-      if (this.transitionCooldown <= 0) {
-        if (newX < -16 || newX >= mapWidth + 16 || newY < -16 || newY >= mapHeight + 16) {
-          this.handleMapTransition(newX, newY, mapWidth, mapHeight);
-          return;
+      // Check if player is at edge
+      const atEdge = newX < 16 || newX >= mapWidth - 16 || newY < 16 || newY >= mapHeight - 16;
+      
+      if (atEdge && this.transitionCooldown <= 0) {
+        // Determine which edge
+        let currentEdgeDirection: 'north' | 'south' | 'east' | 'west' | null = null;
+        if (newX < 16) currentEdgeDirection = 'west';
+        else if (newX >= mapWidth - 16) currentEdgeDirection = 'east';
+        else if (newY < 16) currentEdgeDirection = 'north';
+        else if (newY >= mapHeight - 16) currentEdgeDirection = 'south';
+        
+        if (!this.isAtEdge || this.edgeDirection !== currentEdgeDirection) {
+          // Just reached edge or changed direction
+          this.isAtEdge = true;
+          this.edgeDirection = currentEdgeDirection;
+          this.edgeTimer = 0;
+        } else {
+          // Continue at edge, increment timer
+          this.edgeTimer += deltaTime;
+          
+          // After 2 seconds at edge, trigger transition
+          if (this.edgeTimer >= 2000) {
+            this.handleMapTransition(newX, newY, mapWidth, mapHeight);
+            return;
+          }
         }
+      } else {
+        // Not at edge, reset timer
+        this.isAtEdge = false;
+        this.edgeDirection = null;
+        this.edgeTimer = 0;
       }
 
       // Check collision with tiles
@@ -272,16 +300,21 @@ export class GameEngine {
   private handleMapTransition(newX: number, newY: number, mapWidth: number, mapHeight: number) {
     if (this.isTransitioning || this.transitionCooldown > 0) return; // Prevent multiple transitions
     
+    // Reset edge timer
+    this.isAtEdge = false;
+    this.edgeDirection = null;
+    this.edgeTimer = 0;
+    
     this.isTransitioning = true;
     this.transitionCooldown = 1000; // 1 second cooldown
     
     let direction: 'north' | 'south' | 'east' | 'west' | null = null;
     
     // Determine direction based on player position
-    if (newX < -16) direction = 'west';
-    else if (newX >= mapWidth + 16) direction = 'east';
-    else if (newY < -16) direction = 'north';
-    else if (newY >= mapHeight + 16) direction = 'south';
+    if (newX < 16) direction = 'west';
+    else if (newX >= mapWidth - 16) direction = 'east';
+    else if (newY < 16) direction = 'north';
+    else if (newY >= mapHeight - 16) direction = 'south';
     
     if (!direction) {
       this.isTransitioning = false;
@@ -494,6 +527,41 @@ export class GameEngine {
       // Render UI
       this.renderUI();
     }
+    
+    // Render edge timer if at edge
+    if (this.isAtEdge && this.edgeTimer > 0) {
+      this.renderEdgeTimer();
+    }
+  }
+  
+  private renderEdgeTimer() {
+    const progress = this.edgeTimer / 2000; // 2 seconds
+    const barWidth = 200;
+    const barHeight = 20;
+    const x = (this.canvas.width - barWidth) / 2;
+    const y = 50;
+    
+    // Background
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    this.ctx.fillRect(x - 10, y - 10, barWidth + 20, barHeight + 20);
+    
+    // Progress bar background
+    this.ctx.fillStyle = '#333333';
+    this.ctx.fillRect(x, y, barWidth, barHeight);
+    
+    // Progress bar fill
+    this.ctx.fillStyle = '#ffaa00';
+    this.ctx.fillRect(x, y, barWidth * progress, barHeight);
+    
+    // Text
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = '14px Arial';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(
+      `Transitioning to ${this.edgeDirection}... ${Math.ceil((2000 - this.edgeTimer) / 1000)}s`,
+      this.canvas.width / 2,
+      y + barHeight + 25
+    );
   }
   
   private renderLowGraphics() {
