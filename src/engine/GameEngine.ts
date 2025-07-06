@@ -721,6 +721,14 @@ export class GameEngine {
     this.visibleTileCache = {};
     this.lastCameraPosition = { x: -1, y: -1 };
     
+    // Force discovery of all interior tiles since it's a small enclosed space
+    for (let y = 0; y < this.gameState.currentMap.tiles.length; y++) {
+      for (let x = 0; x < this.gameState.currentMap.tiles[y].length; x++) {
+        this.gameState.currentMap.tiles[y][x].discovered = true;
+        this.gameState.currentMap.tiles[y][x].visible = true;
+      }
+    }
+    
     this.updateCamera();
     this.updateVisibility();
     this.notifyStateChange();
