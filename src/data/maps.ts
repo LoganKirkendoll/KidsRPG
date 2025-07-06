@@ -2,6 +2,7 @@ import { GameMap, Tile, NPC, Enemy, LootableItem, MapConnection } from '../types
 import { items } from './items_data';
 import { npcs } from './npcs_data';
 import { enemies } from './enemies';
+import { buildings } from './buildings';
 
 export const createTile = (x: number, y: number, type: string, walkable: boolean = true): Tile => ({
   x,
@@ -14,7 +15,7 @@ export const createTile = (x: number, y: number, type: string, walkable: boolean
   description: `${type} terrain`
 });
 
-export const createBuilding = (tiles: Tile[][], x: number, y: number, width: number, height: number, type: string, name: string) => {
+export const createBuilding = (tiles: Tile[][], x: number, y: number, width: number, height: number, type: string, name: string, buildingId?: string) => {
   for (let dy = 0; dy < height; dy++) {
     for (let dx = 0; dx < width; dx++) {
       const tileX = x + dx;
@@ -26,6 +27,8 @@ export const createBuilding = (tiles: Tile[][], x: number, y: number, width: num
           walkable: false,
           buildingType: type,
           buildingName: name,
+          buildingId: buildingId,
+          isEnterable: !!buildingId,
           description: `${name} - ${type}`
         };
         
@@ -251,22 +254,22 @@ export const createCapitalWasteland = (): GameMap => {
   // Create multiple cities and settlements
   const buildings = [
     // MEGATON CITY - Main settlement
-    { x: 30, y: 30, width: 8, height: 6, type: 'settlement', name: 'Megaton City Hall' },
+    { x: 30, y: 30, width: 8, height: 6, type: 'settlement', name: 'Megaton City Hall', buildingId: undefined },
     { x: 25, y: 40, width: 6, height: 4, type: 'market', name: 'Megaton Market' },
-    { x: 40, y: 35, width: 5, height: 4, type: 'clinic', name: 'Megaton Medical' },
-    { x: 35, y: 25, width: 4, height: 3, type: 'trader_post', name: 'Craterside Supply' },
+    { x: 40, y: 35, width: 5, height: 4, type: 'clinic', name: 'Megaton Medical', buildingId: 'megaton_clinic' },
+    { x: 35, y: 25, width: 4, height: 3, type: 'trader_post', name: 'Craterside Supply', buildingId: 'craterside_supply' },
     { x: 45, y: 40, width: 4, height: 3, type: 'workshop', name: 'Megaton Workshop' },
     
     // RIVET CITY - Eastern settlement
     { x: 85, y: 50, width: 12, height: 8, type: 'city_hall', name: 'Rivet City Council' },
-    { x: 80, y: 65, width: 8, height: 5, type: 'market', name: 'Rivet City Market' },
+    { x: 80, y: 65, width: 8, height: 5, type: 'market', name: 'Rivet City Market', buildingId: 'rivet_city_market' },
     { x: 95, y: 60, width: 6, height: 4, type: 'clinic', name: 'Rivet City Medical' },
     { x: 75, y: 45, width: 5, height: 4, type: 'trader_post', name: 'Rivet City Trading' },
     { x: 100, y: 45, width: 4, height: 3, type: 'workshop', name: 'Rivet City Tech' },
     
     // CANTERBURY COMMONS - Central trading hub
     { x: 55, y: 75, width: 6, height: 4, type: 'market', name: 'Canterbury Market' },
-    { x: 65, y: 80, width: 5, height: 3, type: 'trader_post', name: 'Uncle Roe\'s Trading' },
+    { x: 65, y: 80, width: 5, height: 3, type: 'trader_post', name: 'Uncle Roe\'s Trading', buildingId: 'canterbury_trading_post' },
     { x: 50, y: 85, width: 4, height: 3, type: 'clinic', name: 'Canterbury Medical' },
     
     // TENPENNY TOWER - Luxury settlement
@@ -293,7 +296,7 @@ export const createCapitalWasteland = (): GameMap => {
     createBuildingArea(tiles, building.x + Math.floor(building.width / 2), building.y + Math.floor(building.height / 2), 8, 'dirt');
     
     // Create the building
-    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
+    createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name, building.buildingId);
     
     // Connect to main roads
     const buildingCenterX = building.x + Math.floor(building.width / 2);

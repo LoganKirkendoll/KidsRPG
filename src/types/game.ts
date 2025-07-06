@@ -219,6 +219,8 @@ export interface Tile {
   description?: string;
   buildingType?: string;
   buildingName?: string;
+  buildingId?: string;
+  isEnterable?: boolean;
   regionType?: string;
   regionName?: string;
   isEntrance?: boolean;
@@ -236,6 +238,8 @@ export interface GameMap {
   enemies: Enemy[];
   lootables: LootableItem[];
   isInterior?: boolean;
+  parentMapId?: string;
+  exitPosition?: Position;
   connections: MapConnection[];
 }
 

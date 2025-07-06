@@ -681,14 +681,17 @@ function App() {
             <div className="text-sm space-y-1">
               <div>• Arrow Keys / WASD: Move</div>
               <div>• Space: Interact with NPCs/Enemies</div>
+              <div>• F: Enter Buildings / Interact</div>
               <div>• I: Inventory</div>
               <div>• E: Equipment</div>
               <div>• M: Map</div>
               <div>• C: Character Sheet</div>
               <div>• Q: Quests</div>
               <div>• F1: Dev Mode</div>
-              <div>• F: Interact</div>
               <div>• ESC: Menu</div>
+              {gameState.currentMap.isInterior && (
+                <div className="text-yellow-400">• ESC: Exit Building</div>
+              )}
             </div>
           </div>
         </div>

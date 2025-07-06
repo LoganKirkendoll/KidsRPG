@@ -1,5 +1,6 @@
 import { GameState, Position, Character, Enemy, NPC, Tile, GameMap } from '../types/game';
 import { maps } from '../data/maps';
+import { getBuildingByPosition, getBuildingById } from '../data/buildings';
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
@@ -135,6 +136,12 @@ export class GameEngine {
         this.gameState.gameMode = 'map';
         this.notifyStateChange();
         break;
+      case 'escape':
+        // Exit building if in interior
+        if (this.gameState.currentMap.isInterior && this.gameState.previousMap) {
+          this.exitBuilding();
+        }
+        break;
       case 'f1':
         this.gameState.devMode = this.gameState.devMode || {
           enabled: false,
@@ -156,6 +163,23 @@ export class GameEngine {
   private handleInteraction() {
     const playerPos = this.gameState.player.position;
     const interactionRange = 48; // 1.5 tiles
+    
+    // Check for enterable buildings first
+    const playerTileX = Math.floor(playerPos.x / 32);
+    const playerTileY = Math.floor(playerPos.y / 32);
+    const currentTile = this.gameState.currentMap.tiles[playerTileY]?.[playerTileX];
+    
+    if (currentTile?.isEnterable && currentTile.buildingId) {
+      this.enterBuilding(currentTile.buildingId);
+      return;
+    }
+    
+    // Check for nearby building entrances
+    const nearbyBuilding = getBuildingByPosition(playerPos, interactionRange);
+    if (nearbyBuilding) {
+      this.enterBuilding(nearbyBuilding.id);
+      return;
+    }
 
     // Check for NPCs
     const nearbyNPC = this.gameState.currentMap.npcs.find(npc => {
@@ -661,6 +685,45 @@ export class GameEngine {
     });
   }
   
+  private enterBuilding(buildingId: string) {
+    const building = getBuildingById(buildingId);
+    if (!building) return;
+    
+    // Store current map and position for return
+    this.gameState.previousMap = {
+      map: this.gameState.currentMap,
+      position: { ...this.gameState.player.position }
+    };
+    
+    // Switch to building interior
+    this.gameState.currentMap = building.interiorMap;
+    this.gameState.player.position = { ...building.exitPosition };
+    
+    // Clear caches for new map
+    this.visibleTileCache = {};
+    this.lastCameraPosition = { x: -1, y: -1 };
+    
+    this.updateCamera();
+    this.updateVisibility();
+    this.notifyStateChange();
+  }
+  
+  private exitBuilding() {
+    if (!this.gameState.previousMap) return;
+    
+    // Return to previous map
+    this.gameState.currentMap = this.gameState.previousMap.map;
+    this.gameState.player.position = { ...this.gameState.previousMap.position };
+    this.gameState.previousMap = undefined;
+    
+    // Clear caches for map change
+    this.visibleTileCache = {};
+    this.lastCameraPosition = { x: -1, y: -1 };
+    
+    this.updateCamera();
+    this.updateVisibility();
+    this.notifyStateChange();
+  }
   private renderSimpleUI() {
     const healthPercent = this.gameState.player.health / this.gameState.player.maxHealth;
     this.ctx.fillStyle = '#333333';
@@ -698,6 +761,16 @@ export class GameEngine {
           this.ctx.strokeStyle = this.darkenColor(color, 0.8);
           this.ctx.lineWidth = 1;
           this.ctx.strokeRect(screenX, screenY, 32, 32);
+        }
+        
+        // Render entrance indicator for enterable buildings
+        if (tile.isEnterable && tile.visible) {
+          this.ctx.fillStyle = '#ffff00';
+          this.ctx.fillRect(screenX + 12, screenY + 12, 8, 8);
+          this.ctx.fillStyle = '#000000';
+          this.ctx.font = '12px Arial';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('E', screenX + 16, screenY + 18);
         }
       }
     }
@@ -859,6 +932,13 @@ export class GameEngine {
     this.ctx.fillText(`Level: ${this.gameState.player.level}`, 15, 75);
     this.ctx.fillText(`XP: ${this.gameState.player.experience}/${this.gameState.player.experienceToNext}`, 15, 90);
     this.ctx.fillText(`Location: ${this.gameState.currentMap.name}`, 15, 110);
+    
+    // Show exit hint for interiors
+    if (this.gameState.currentMap.isInterior && this.gameState.previousMap) {
+      this.ctx.fillStyle = '#ffff00';
+      this.ctx.font = '12px Arial';
+      this.ctx.fillText('Press ESC to exit building', 15, 130);
+    }
 
     // Only render mini-map on high performance devices
     if (!this.isLowPerformanceDevice) {
