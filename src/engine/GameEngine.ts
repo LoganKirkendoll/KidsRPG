@@ -781,24 +781,38 @@ export class GameEngine {
   }
 
   private renderTiles() {
-    for (let y = this.renderBounds.startY; y < this.renderBounds.endY; y++) {
-      for (let x = this.renderBounds.startX; x < this.renderBounds.endX; x++) {
+    // Ensure we have valid render bounds
+    const actualMapHeight = this.gameState.currentMap.tiles.length;
+    const actualMapWidth = this.gameState.currentMap.tiles[0]?.length || 0;
+    
+    // For interior maps, render all tiles regardless of discovery
+    const isInterior = this.gameState.currentMap.isInterior;
+    
+    // Clamp render bounds to actual map size
+    const startY = Math.max(0, Math.min(this.renderBounds.startY, actualMapHeight - 1));
+    const endY = Math.min(this.renderBounds.endY, actualMapHeight);
+    const startX = Math.max(0, Math.min(this.renderBounds.startX, actualMapWidth - 1));
+    const endX = Math.min(this.renderBounds.endX, actualMapWidth);
+    
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
         // Ensure we don't access out-of-bounds tiles
-        if (y < 0 || y >= this.gameState.currentMap.tiles.length || 
-            x < 0 || !this.gameState.currentMap.tiles[y] || 
-            x >= this.gameState.currentMap.tiles[y].length) {
+        if (!this.gameState.currentMap.tiles[y] || !this.gameState.currentMap.tiles[y][x]) {
           continue;
         }
         
         const tile = this.gameState.currentMap.tiles[y][x];
-        if (!tile.discovered) continue;
+        
+        // For interior maps, always render tiles. For exterior maps, check discovery
+        if (!isInterior && !tile.discovered) continue;
 
         const screenX = x * 32 - this.gameState.camera.x;
         const screenY = y * 32 - this.gameState.camera.y;
 
         let color = this.getTileColor(tile.type);
         
-        if (!tile.visible) {
+        // For interior maps, don't darken tiles. For exterior maps, darken non-visible tiles
+        if (!isInterior && !tile.visible) {
           color = this.darkenColor(color, 0.5);
         }
 
@@ -806,14 +820,21 @@ export class GameEngine {
         this.ctx.fillRect(screenX, screenY, 32, 32);
 
         // Only draw borders in high quality mode
-        if (!this.isLowPerformanceDevice) {
+        if (!this.isLowPerformanceDevice && !isInterior) {
           this.ctx.strokeStyle = this.darkenColor(color, 0.8);
           this.ctx.lineWidth = 1;
           this.ctx.strokeRect(screenX, screenY, 32, 32);
         }
         
+        // For interior maps, draw clear borders to show room structure
+        if (isInterior && !this.isLowPerformanceDevice) {
+          this.ctx.strokeStyle = '#000000';
+          this.ctx.lineWidth = 1;
+          this.ctx.strokeRect(screenX, screenY, 32, 32);
+        }
+        
         // Render entrance indicator for enterable buildings
-        if (tile.isEnterable && tile.visible && !this.isLowPerformanceDevice) {
+        if (!isInterior && tile.isEnterable && tile.visible && !this.isLowPerformanceDevice) {
           this.ctx.fillStyle = '#ffff00';
           this.ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
           this.ctx.fillStyle = '#000000';

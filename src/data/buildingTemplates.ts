@@ -394,35 +394,45 @@ export function createBuildingFromTemplate(
   for (let y = 0; y < template.height; y++) {
     const row: Tile[] = [];
     for (let x = 0; x < template.width; x++) {
-      row.push(createTile(x, y, template.floorType, true));
+      row.push(createTile(x, y, 'stone', true));
     }
     tiles.push(row);
   }
   
   // Add walls around perimeter
   for (let x = 0; x < template.width; x++) {
-    tiles[0][x] = createTile(x, 0, template.wallType, false);
-    tiles[template.height - 1][x] = createTile(x, template.height - 1, template.wallType, false);
+    tiles[0][x] = createTile(x, 0, 'ruins', false);
+    tiles[template.height - 1][x] = createTile(x, template.height - 1, 'ruins', false);
   }
   for (let y = 0; y < template.height; y++) {
-    tiles[y][0] = createTile(0, y, template.wallType, false);
-    tiles[y][template.width - 1] = createTile(template.width - 1, y, template.wallType, false);
+    tiles[y][0] = createTile(0, y, 'ruins', false);
+    tiles[y][template.width - 1] = createTile(template.width - 1, y, 'ruins', false);
   }
   
   // Add entrances
   template.entrancePositions.forEach(entrance => {
-    tiles[entrance.y][entrance.x] = createTile(entrance.x, entrance.y, template.floorType, true);
+    tiles[entrance.y][entrance.x] = createTile(entrance.x, entrance.y, 'stone', true);
     tiles[entrance.y][entrance.x].isEntrance = true;
   });
   
   // Add furniture
   template.furnitureLayout.forEach(furniture => {
-    tiles[furniture.position.y][furniture.position.x] = createTile(
-      furniture.position.x, 
-      furniture.position.y, 
-      furniture.type, 
-      furniture.walkable
-    );
+    if (furniture.type === 'building') {
+      // Use dirt for furniture/obstacles
+      tiles[furniture.position.y][furniture.position.x] = createTile(
+        furniture.position.x, 
+        furniture.position.y, 
+        'dirt', 
+        furniture.walkable
+      );
+    } else {
+      tiles[furniture.position.y][furniture.position.x] = createTile(
+        furniture.position.x, 
+        furniture.position.y, 
+        furniture.type, 
+        furniture.walkable
+      );
+    }
   });
   
   // Create NPCs
