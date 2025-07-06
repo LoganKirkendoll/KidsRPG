@@ -1,9 +1,9 @@
 import { Character, Skill, Item, Enemy, GameMap, Quest, Achievement, NPC } from '../types/game';
 import { skills } from './skills';
+import { maps } from './maps';
 import { allQuests } from './quests';
 import { items } from './items_data';
 import { npcs } from './npcs_data';
-import { maps } from './maps';
 
 export const characterClasses = {
   warrior: {
@@ -272,6 +272,7 @@ export const createStartingCharacter = (name: string, characterClass: keyof type
 };
 
 export const createStartingMap = (): GameMap => {
+  // Use the new map creation system
   return maps.capital_wasteland();
 };
 

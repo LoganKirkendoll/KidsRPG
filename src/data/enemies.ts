@@ -5,7 +5,7 @@ import { skills } from './skills';
 export const enemies: Enemy[] = [
   // CAPITAL WASTELAND ENEMIES
   {
-    id: 'raider_scavenger_1',
+    id: 'raider_scavenger',
     name: 'Raider Scavenger',
     type: 'raider',
     mapId: 'capital_wasteland',
@@ -22,7 +22,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.7, quantity: 2 },
       { item: items.find(i => i.id === 'stimpak')!, chance: 0.2, quantity: 1 }
     ],
-    position: { x: 35 * 32, y: 60 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'raider_scavenger',
@@ -32,34 +32,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'raider_scavenger_2',
-    name: 'Raider Scavenger',
-    type: 'raider',
-    mapId: 'capital_wasteland',
-    level: 3,
-    health: 50,
-    maxHealth: 50,
-    energy: 15,
-    maxEnergy: 15,
-    defense: 4,
-    damage: 16,
-    experience: 25,
-    loot: [
-      { item: items.find(i => i.id === 'combat_knife')!, chance: 0.3, quantity: 1 },
-      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.8, quantity: 3 },
-      { item: items.find(i => i.id === 'stimpak')!, chance: 0.3, quantity: 1 }
-    ],
-    position: { x: 65 * 32, y: 90 * 32 },
-    direction: 'down',
-    isMoving: false,
-    sprite: 'raider_scavenger',
-    ai: { type: 'aggressive', range: 7, speed: 68 },
-    statusEffects: [],
-    skills: [skills.find(s => s.id === 'slash')!, skills.find(s => s.id === 'quick_shot')!]
-  },
-
-  {
-    id: 'super_mutant_brute_1',
+    id: 'super_mutant_brute',
     name: 'Super Mutant Brute',
     type: 'mutant',
     mapId: 'capital_wasteland',
@@ -76,7 +49,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.9, quantity: 5 },
       { item: items.find(i => i.id === 'rad_away')!, chance: 0.4, quantity: 2 }
     ],
-    position: { x: 75 * 32, y: 55 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'super_mutant_brute',
@@ -86,34 +59,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'super_mutant_brute_2',
-    name: 'Super Mutant Brute',
-    type: 'mutant',
-    mapId: 'capital_wasteland',
-    level: 9,
-    health: 170,
-    maxHealth: 170,
-    energy: 25,
-    maxEnergy: 25,
-    defense: 14,
-    damage: 38,
-    experience: 90,
-    loot: [
-      { item: items.find(i => i.id === 'assault_rifle')!, chance: 0.4, quantity: 1 },
-      { item: items.find(i => i.id === 'scrap_metal')!, chance: 1.0, quantity: 6 },
-      { item: items.find(i => i.id === 'rad_away')!, chance: 0.5, quantity: 2 }
-    ],
-    position: { x: 85 * 32, y: 75 * 32 },
-    direction: 'down',
-    isMoving: false,
-    sprite: 'super_mutant_brute',
-    ai: { type: 'aggressive', range: 9, speed: 52 },
-    statusEffects: [],
-    skills: [skills.find(s => s.id === 'power_strike')!, skills.find(s => s.id === 'aimed_shot')!, skills.find(s => s.id === 'defensive_stance')!]
-  },
-
-  {
-    id: 'enclave_soldier_1',
+    id: 'enclave_soldier',
     name: 'Enclave Soldier',
     type: 'robot',
     mapId: 'capital_wasteland',
@@ -127,10 +73,10 @@ export const enemies: Enemy[] = [
     experience: 120,
     loot: [
       { item: items.find(i => i.id === 'plasma_rifle')!, chance: 0.5, quantity: 1 },
-      { item: items.find(i => i.id === 'enclave_armor')!, chance: 0.2, quantity: 1 },
+      { item: items.find(i => i.id === 'power_armor')!, chance: 0.2, quantity: 1 },
       { item: items.find(i => i.id === 'electronics')!, chance: 0.8, quantity: 3 }
     ],
-    position: { x: 110 * 32, y: 25 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'enclave_soldier',
@@ -140,7 +86,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'feral_ghoul_1',
+    id: 'feral_ghoul',
     name: 'Feral Ghoul',
     type: 'mutant',
     mapId: 'capital_wasteland',
@@ -156,7 +102,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.5, quantity: 1 },
       { item: items.find(i => i.id === 'rad_away')!, chance: 0.6, quantity: 1 }
     ],
-    position: { x: 95 * 32, y: 115 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'feral_ghoul',
@@ -166,33 +112,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'feral_ghoul_2',
-    name: 'Feral Ghoul',
-    type: 'mutant',
-    mapId: 'capital_wasteland',
-    level: 5,
-    health: 70,
-    maxHealth: 70,
-    energy: 18,
-    maxEnergy: 18,
-    defense: 3,
-    damage: 22,
-    experience: 40,
-    loot: [
-      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.6, quantity: 2 },
-      { item: items.find(i => i.id === 'rad_away')!, chance: 0.7, quantity: 1 }
-    ],
-    position: { x: 15 * 32, y: 95 * 32 },
-    direction: 'down',
-    isMoving: false,
-    sprite: 'feral_ghoul',
-    ai: { type: 'aggressive', range: 6, speed: 85 },
-    statusEffects: [],
-    skills: [skills.find(s => s.id === 'slash')!, skills.find(s => s.id === 'poison_dart')!]
-  },
-
-  {
-    id: 'deathclaw_1',
+    id: 'deathclaw',
     name: 'Deathclaw',
     type: 'beast',
     mapId: 'capital_wasteland',
@@ -208,7 +128,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'rare_earth')!, chance: 0.7, quantity: 2 },
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.9, quantity: 8 }
     ],
-    position: { x: 130 * 32, y: 100 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'deathclaw',
@@ -217,59 +137,9 @@ export const enemies: Enemy[] = [
     skills: [skills.find(s => s.id === 'power_strike')!, skills.find(s => s.id === 'slash')!]
   },
 
-  {
-    id: 'mole_rat_1',
-    name: 'Giant Mole Rat',
-    type: 'beast',
-    mapId: 'capital_wasteland',
-    level: 2,
-    health: 35,
-    maxHealth: 35,
-    energy: 10,
-    maxEnergy: 10,
-    defense: 1,
-    damage: 12,
-    experience: 15,
-    loot: [
-      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.3, quantity: 1 }
-    ],
-    position: { x: 55 * 32, y: 35 * 32 },
-    direction: 'down',
-    isMoving: false,
-    sprite: 'mole_rat',
-    ai: { type: 'aggressive', range: 4, speed: 88 },
-    statusEffects: [],
-    skills: [skills.find(s => s.id === 'quick_shot')!]
-  },
-
-  {
-    id: 'radroach_1',
-    name: 'Radroach',
-    type: 'beast',
-    mapId: 'capital_wasteland',
-    level: 1,
-    health: 20,
-    maxHealth: 20,
-    energy: 8,
-    maxEnergy: 8,
-    defense: 0,
-    damage: 8,
-    experience: 10,
-    loot: [
-      { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.2, quantity: 1 }
-    ],
-    position: { x: 25 * 32, y: 25 * 32 },
-    direction: 'down',
-    isMoving: false,
-    sprite: 'radroach',
-    ai: { type: 'aggressive', range: 3, speed: 96 },
-    statusEffects: [],
-    skills: [skills.find(s => s.id === 'slash')!]
-  },
-
   // THE PITT ENEMIES
   {
-    id: 'trog_1',
+    id: 'trog',
     name: 'Trog',
     type: 'mutant',
     mapId: 'the_pitt',
@@ -285,7 +155,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.8, quantity: 3 },
       { item: items.find(i => i.id === 'electronics')!, chance: 0.3, quantity: 1 }
     ],
-    position: { x: 30 * 32, y: 40 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'trog',
@@ -295,7 +165,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'pitt_raider_1',
+    id: 'pitt_raider',
     name: 'Pitt Raider',
     type: 'raider',
     mapId: 'the_pitt',
@@ -312,7 +182,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'assault_rifle')!, chance: 0.3, quantity: 1 },
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.9, quantity: 4 }
     ],
-    position: { x: 50 * 32, y: 35 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'pitt_raider',
@@ -322,7 +192,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'wildman_1',
+    id: 'wildman',
     name: 'Wildman',
     type: 'mutant',
     mapId: 'the_pitt',
@@ -338,7 +208,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.7, quantity: 3 },
       { item: items.find(i => i.id === 'stimpak')!, chance: 0.5, quantity: 2 }
     ],
-    position: { x: 70 * 32, y: 75 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'wildman',
@@ -349,7 +219,7 @@ export const enemies: Enemy[] = [
 
   // POINT LOOKOUT ENEMIES
   {
-    id: 'swampfolk_1',
+    id: 'swampfolk',
     name: 'Swampfolk',
     type: 'mutant',
     mapId: 'point_lookout',
@@ -366,7 +236,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'stimpak')!, chance: 0.4, quantity: 2 },
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.5, quantity: 2 }
     ],
-    position: { x: 40 * 32, y: 50 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'swampfolk',
@@ -376,7 +246,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'mirelurk_1',
+    id: 'mirelurk',
     name: 'Mirelurk',
     type: 'beast',
     mapId: 'point_lookout',
@@ -392,7 +262,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.8, quantity: 4 },
       { item: items.find(i => i.id === 'rad_away')!, chance: 0.3, quantity: 1 }
     ],
-    position: { x: 60 * 32, y: 70 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'mirelurk',
@@ -402,7 +272,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'tribal_warrior_1',
+    id: 'tribal_warrior',
     name: 'Tribal Warrior',
     type: 'raider',
     mapId: 'point_lookout',
@@ -419,7 +289,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'stimpak')!, chance: 0.6, quantity: 2 },
       { item: items.find(i => i.id === 'rare_earth')!, chance: 0.2, quantity: 1 }
     ],
-    position: { x: 65 * 32, y: 45 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'tribal_warrior',
@@ -430,7 +300,7 @@ export const enemies: Enemy[] = [
 
   // MOTHERSHIP ZETA ENEMIES
   {
-    id: 'alien_worker_1',
+    id: 'alien_worker',
     name: 'Alien Worker',
     type: 'robot',
     mapId: 'mothership_zeta',
@@ -444,10 +314,9 @@ export const enemies: Enemy[] = [
     experience: 100,
     loot: [
       { item: items.find(i => i.id === 'electronics')!, chance: 0.9, quantity: 5 },
-      { item: items.find(i => i.id === 'rare_earth')!, chance: 0.6, quantity: 2 },
-      { item: items.find(i => i.id === 'alien_power_cell')!, chance: 0.4, quantity: 1 }
+      { item: items.find(i => i.id === 'rare_earth')!, chance: 0.6, quantity: 2 }
     ],
-    position: { x: 25 * 32, y: 25 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'alien_worker',
@@ -457,7 +326,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'alien_soldier_1',
+    id: 'alien_soldier',
     name: 'Alien Soldier',
     type: 'robot',
     mapId: 'mothership_zeta',
@@ -470,12 +339,11 @@ export const enemies: Enemy[] = [
     damage: 55,
     experience: 150,
     loot: [
-      { item: items.find(i => i.id === 'alien_blaster')!, chance: 0.3, quantity: 1 },
+      { item: items.find(i => i.id === 'plasma_rifle')!, chance: 0.8, quantity: 1 },
       { item: items.find(i => i.id === 'electronics')!, chance: 1.0, quantity: 8 },
-      { item: items.find(i => i.id === 'rare_earth')!, chance: 0.7, quantity: 3 },
-      { item: items.find(i => i.id === 'alien_power_cell')!, chance: 0.8, quantity: 2 }
+      { item: items.find(i => i.id === 'rare_earth')!, chance: 0.7, quantity: 3 }
     ],
-    position: { x: 45 * 32, y: 15 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'alien_soldier',
@@ -485,7 +353,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'alien_captain_1',
+    id: 'alien_captain',
     name: 'Alien Captain',
     type: 'boss',
     mapId: 'mothership_zeta',
@@ -498,12 +366,11 @@ export const enemies: Enemy[] = [
     damage: 70,
     experience: 300,
     loot: [
-      { item: items.find(i => i.id === 'alien_blaster')!, chance: 1.0, quantity: 1 },
-      { item: items.find(i => i.id === 'power_armor')!, chance: 0.8, quantity: 1 },
-      { item: items.find(i => i.id === 'rare_earth')!, chance: 1.0, quantity: 10 },
-      { item: items.find(i => i.id === 'alien_power_cell')!, chance: 1.0, quantity: 5 }
+      { item: items.find(i => i.id === 'power_armor')!, chance: 1.0, quantity: 1 },
+      { item: items.find(i => i.id === 'plasma_rifle')!, chance: 1.0, quantity: 1 },
+      { item: items.find(i => i.id === 'rare_earth')!, chance: 1.0, quantity: 10 }
     ],
-    position: { x: 47 * 32, y: 15 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'alien_captain',
@@ -512,9 +379,64 @@ export const enemies: Enemy[] = [
     skills: [skills.find(s => s.id === 'explosive_shot')!, skills.find(s => s.id === 'turret_deploy')!, skills.find(s => s.id === 'emp_blast')!]
   },
 
+  // CITADEL ENEMIES
+  {
+    id: 'brotherhood_outcast',
+    name: 'Brotherhood Outcast',
+    type: 'robot',
+    mapId: 'citadel',
+    level: 10,
+    health: 160,
+    maxHealth: 160,
+    energy: 35,
+    maxEnergy: 35,
+    defense: 16,
+    damage: 42,
+    experience: 95,
+    loot: [
+      { item: items.find(i => i.id === 'combat_armor')!, chance: 0.8, quantity: 1 },
+      { item: items.find(i => i.id === 'assault_rifle')!, chance: 0.6, quantity: 1 },
+      { item: items.find(i => i.id === 'electronics')!, chance: 0.7, quantity: 3 }
+    ],
+    position: { x: 0, y: 0 },
+    direction: 'down',
+    isMoving: false,
+    sprite: 'brotherhood_outcast',
+    ai: { type: 'aggressive', range: 10, speed: 56 },
+    statusEffects: [],
+    skills: [skills.find(s => s.id === 'aimed_shot')!, skills.find(s => s.id === 'defensive_stance')!]
+  },
+
+  {
+    id: 'super_mutant_master',
+    name: 'Super Mutant Master',
+    type: 'boss',
+    mapId: 'citadel',
+    level: 18,
+    health: 500,
+    maxHealth: 500,
+    energy: 60,
+    maxEnergy: 60,
+    defense: 20,
+    damage: 80,
+    experience: 400,
+    loot: [
+      { item: items.find(i => i.id === 'power_armor')!, chance: 0.8, quantity: 1 },
+      { item: items.find(i => i.id === 'plasma_rifle')!, chance: 1.0, quantity: 1 },
+      { item: items.find(i => i.id === 'rare_earth')!, chance: 1.0, quantity: 8 }
+    ],
+    position: { x: 0, y: 0 },
+    direction: 'down',
+    isMoving: false,
+    sprite: 'super_mutant_master',
+    ai: { type: 'aggressive', range: 12, speed: 48 },
+    statusEffects: [],
+    skills: [skills.find(s => s.id === 'power_strike')!, skills.find(s => s.id === 'explosive_shot')!, skills.find(s => s.id === 'adrenaline_shot')!]
+  },
+
   // METRO TUNNELS ENEMIES
   {
-    id: 'tunnel_rat_1',
+    id: 'tunnel_rat',
     name: 'Giant Tunnel Rat',
     type: 'beast',
     mapId: 'metro_tunnels',
@@ -530,7 +452,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.4, quantity: 1 },
       { item: items.find(i => i.id === 'stimpak')!, chance: 0.2, quantity: 1 }
     ],
-    position: { x: 45 * 32, y: 40 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'tunnel_rat',
@@ -540,7 +462,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'metro_ghoul_1',
+    id: 'metro_ghoul',
     name: 'Metro Ghoul',
     type: 'mutant',
     mapId: 'metro_tunnels',
@@ -556,7 +478,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'rad_away')!, chance: 0.7, quantity: 1 },
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 0.6, quantity: 2 }
     ],
-    position: { x: 95 * 32, y: 35 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'metro_ghoul',
@@ -566,7 +488,7 @@ export const enemies: Enemy[] = [
   },
 
   {
-    id: 'metro_security_robot_1',
+    id: 'metro_security_robot',
     name: 'Metro Security Robot',
     type: 'robot',
     mapId: 'metro_tunnels',
@@ -582,7 +504,7 @@ export const enemies: Enemy[] = [
       { item: items.find(i => i.id === 'electronics')!, chance: 0.9, quantity: 4 },
       { item: items.find(i => i.id === 'scrap_metal')!, chance: 1.0, quantity: 6 }
     ],
-    position: { x: 145 * 32, y: 40 * 32 },
+    position: { x: 0, y: 0 },
     direction: 'down',
     isMoving: false,
     sprite: 'metro_security_robot',
