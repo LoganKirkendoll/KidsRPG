@@ -254,41 +254,43 @@ export const createCapitalWasteland = (): GameMap => {
   // Create multiple cities and settlements
   const buildings = [
     // MEGATON CITY - Main settlement
-    { x: 30, y: 30, width: 8, height: 6, type: 'settlement', name: 'Megaton City Hall', buildingId: undefined },
-    { x: 25, y: 40, width: 6, height: 4, type: 'market', name: 'Megaton Market' },
+    { x: 30, y: 30, width: 8, height: 6, type: 'settlement', name: 'Megaton City Hall' },
+    { x: 25, y: 40, width: 6, height: 4, type: 'market', name: 'Megaton Market', buildingId: 'megaton_saloon' },
     { x: 40, y: 35, width: 5, height: 4, type: 'clinic', name: 'Megaton Medical', buildingId: 'megaton_clinic' },
     { x: 35, y: 25, width: 4, height: 3, type: 'trader_post', name: 'Craterside Supply', buildingId: 'craterside_supply' },
-    { x: 45, y: 40, width: 4, height: 3, type: 'workshop', name: 'Megaton Workshop' },
+    { x: 45, y: 40, width: 4, height: 3, type: 'workshop', name: 'Megaton Armory', buildingId: 'megaton_armory' },
+    { x: 28, y: 35, width: 4, height: 3, type: 'tavern', name: 'Megaton Saloon', buildingId: 'megaton_saloon' },
+    { x: 32, y: 28, width: 4, height: 3, type: 'security', name: 'Security Office', buildingId: 'megaton_security' },
     
     // RIVET CITY - Eastern settlement
-    { x: 85, y: 50, width: 12, height: 8, type: 'city_hall', name: 'Rivet City Council' },
+    { x: 85, y: 50, width: 12, height: 8, type: 'city_hall', name: 'Rivet City Council', buildingId: 'rivet_city_bar' },
     { x: 80, y: 65, width: 8, height: 5, type: 'market', name: 'Rivet City Market', buildingId: 'rivet_city_market' },
-    { x: 95, y: 60, width: 6, height: 4, type: 'clinic', name: 'Rivet City Medical' },
-    { x: 75, y: 45, width: 5, height: 4, type: 'trader_post', name: 'Rivet City Trading' },
-    { x: 100, y: 45, width: 4, height: 3, type: 'workshop', name: 'Rivet City Tech' },
+    { x: 95, y: 60, width: 6, height: 4, type: 'clinic', name: 'Rivet City Medical', buildingId: 'rivet_city_clinic' },
+    { x: 75, y: 45, width: 5, height: 4, type: 'trader_post', name: 'Rivet City Armory', buildingId: 'rivet_city_armory' },
+    { x: 100, y: 45, width: 4, height: 3, type: 'workshop', name: 'Rivet City Security', buildingId: 'rivet_city_security' },
     
     // CANTERBURY COMMONS - Central trading hub
-    { x: 55, y: 75, width: 6, height: 4, type: 'market', name: 'Canterbury Market' },
+    { x: 55, y: 75, width: 6, height: 4, type: 'market', name: 'Canterbury Inn', buildingId: 'canterbury_inn' },
     { x: 65, y: 80, width: 5, height: 3, type: 'trader_post', name: 'Uncle Roe\'s Trading', buildingId: 'canterbury_trading_post' },
-    { x: 50, y: 85, width: 4, height: 3, type: 'clinic', name: 'Canterbury Medical' },
+    { x: 50, y: 85, width: 4, height: 3, type: 'clinic', name: 'Canterbury Medical', buildingId: 'canterbury_clinic' },
     
     // TENPENNY TOWER - Luxury settlement
-    { x: 15, y: 80, width: 8, height: 10, type: 'luxury_tower', name: 'Tenpenny Tower' },
-    { x: 10, y: 95, width: 5, height: 3, type: 'market', name: 'Tenpenny Market' },
-    { x: 25, y: 92, width: 4, height: 3, type: 'clinic', name: 'Tenpenny Medical' },
+    { x: 15, y: 80, width: 8, height: 10, type: 'luxury_tower', name: 'Tenpenny Tower', buildingId: 'tenpenny_lobby' },
+    { x: 10, y: 95, width: 5, height: 3, type: 'market', name: 'Tenpenny Shop', buildingId: 'tenpenny_shop' },
+    { x: 25, y: 92, width: 4, height: 3, type: 'clinic', name: 'Tenpenny Medical', buildingId: 'tenpenny_clinic' },
     
     // AREFU - Small settlement
-    { x: 90, y: 15, width: 5, height: 4, type: 'settlement', name: 'Arefu Town Hall' },
-    { x: 85, y: 25, width: 4, height: 3, type: 'trader_post', name: 'Arefu Trading' },
-    { x: 95, y: 20, width: 3, height: 2, type: 'clinic', name: 'Arefu Medical' },
+    { x: 90, y: 15, width: 5, height: 4, type: 'settlement', name: 'Arefu Town Hall', buildingId: 'arefu_store' },
+    { x: 85, y: 25, width: 4, height: 3, type: 'trader_post', name: 'Arefu Store', buildingId: 'arefu_store' },
+    { x: 95, y: 20, width: 3, height: 2, type: 'clinic', name: 'Arefu Medical', buildingId: 'arefu_clinic' },
     
     // VAULT 101
     { x: 15, y: 15, width: 8, height: 6, type: 'vault', name: 'Vault 101' },
     
     // Scattered buildings
-    { x: 70, y: 25, width: 4, height: 3, type: 'workshop', name: 'Scrapyard Workshop' },
+    { x: 70, y: 25, width: 4, height: 3, type: 'workshop', name: 'Scrapyard Shop', buildingId: 'scrapyard_shop' },
     { x: 25, y: 70, width: 3, height: 2, type: 'trader_post', name: 'Lone Wanderer Trading' },
-    { x: 105, y: 85, width: 4, height: 3, type: 'clinic', name: 'Wasteland Medical' }
+    { x: 105, y: 85, width: 4, height: 3, type: 'clinic', name: 'Wasteland Medical', buildingId: 'lone_wanderer_clinic' }
   ];
   
   buildings.forEach(building => {

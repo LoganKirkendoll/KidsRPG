@@ -162,16 +162,24 @@ export class GameEngine {
 
   private handleInteraction() {
     const playerPos = this.gameState.player.position;
-    const interactionRange = 48; // 1.5 tiles
+    const interactionRange = 64; // 2 tiles for better building detection
     
     // Check for enterable buildings first
     const playerTileX = Math.floor(playerPos.x / 32);
     const playerTileY = Math.floor(playerPos.y / 32);
-    const currentTile = this.gameState.currentMap.tiles[playerTileY]?.[playerTileX];
     
-    if (currentTile?.isEnterable && currentTile.buildingId) {
-      this.enterBuilding(currentTile.buildingId);
-      return;
+    // Check surrounding tiles for enterable buildings
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const checkY = playerTileY + dy;
+        const checkX = playerTileX + dx;
+        const tile = this.gameState.currentMap.tiles[checkY]?.[checkX];
+        
+        if (tile?.isEnterable && tile.buildingId) {
+          this.enterBuilding(tile.buildingId);
+          return;
+        }
+      }
     }
     
     // Check for nearby building entrances
@@ -764,13 +772,13 @@ export class GameEngine {
         }
         
         // Render entrance indicator for enterable buildings
-        if (tile.isEnterable && tile.visible) {
+        if (tile.isEnterable && tile.visible && !this.isLowPerformanceDevice) {
           this.ctx.fillStyle = '#ffff00';
-          this.ctx.fillRect(screenX + 12, screenY + 12, 8, 8);
+          this.ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
           this.ctx.fillStyle = '#000000';
-          this.ctx.font = '12px Arial';
+          this.ctx.font = '14px Arial';
           this.ctx.textAlign = 'center';
-          this.ctx.fillText('E', screenX + 16, screenY + 18);
+          this.ctx.fillText('E', screenX + 16, screenY + 20);
         }
       }
     }
