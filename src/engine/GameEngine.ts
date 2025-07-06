@@ -240,7 +240,10 @@ export class GameEngine {
     
     // Switch to interior
     this.gameState.currentMap = interiorMap;
-    this.gameState.player.position = { x: 160, y: 280 }; // Near the entrance
+    
+    // Find a safe spawn position
+    const spawnPosition = this.findSafeSpawnPosition(interiorMap);
+    this.gameState.player.position = spawnPosition;
     
     this.updateCamera();
     this.updateVisibility();
@@ -259,11 +262,78 @@ export class GameEngine {
     
     // Switch to region
     this.gameState.currentMap = regionMap;
-    this.gameState.player.position = { x: 160, y: 280 }; // Near the entrance
+    
+    // Find a safe spawn position
+    const spawnPosition = this.findSafeSpawnPosition(regionMap);
+    this.gameState.player.position = spawnPosition;
     
     this.updateCamera();
     this.updateVisibility();
     this.notifyStateChange();
+  }
+
+  private findSafeSpawnPosition(map: any): Position {
+    // Start from the bottom center and work our way up to find a safe spot
+    const centerX = Math.floor(map.width / 2);
+    const startY = map.height - 3; // Start a bit up from the bottom
+    
+    // Check positions in expanding circles from the center bottom
+    for (let radius = 0; radius < 10; radius++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const checkX = centerX + dx;
+          const checkY = startY + dy;
+          
+          // Make sure we're within bounds
+          if (checkX >= 0 && checkX < map.width && checkY >= 0 && checkY < map.height) {
+            const tile = map.tiles[checkY][checkX];
+            
+            // Check if this position is walkable and safe
+            if (tile.walkable && this.isPositionSafe(map, checkX, checkY)) {
+              return {
+                x: checkX * 32 + 16, // Center of tile
+                y: checkY * 32 + 16
+              };
+            }
+          }
+        }
+      }
+    }
+    
+    // Fallback to a basic safe position if nothing found
+    return { x: centerX * 32 + 16, y: (startY + 1) * 32 + 16 };
+  }
+
+  private isPositionSafe(map: any, tileX: number, tileY: number): boolean {
+    // Check that the position and surrounding area are walkable
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const checkX = tileX + dx;
+        const checkY = tileY + dy;
+        
+        if (checkX >= 0 && checkX < map.width && checkY >= 0 && checkY < map.height) {
+          const tile = map.tiles[checkY][checkX];
+          if (!tile.walkable) {
+            return false; // Not safe if any surrounding tile is blocked
+          }
+        }
+      }
+    }
+    
+    // Also check that there are no enemies or NPCs too close
+    const worldX = tileX * 32 + 16;
+    const worldY = tileY * 32 + 16;
+    
+    for (const enemy of map.enemies) {
+      const distance = Math.sqrt(
+        Math.pow(worldX - enemy.position.x, 2) + Math.pow(worldY - enemy.position.y, 2)
+      );
+      if (distance < 64) { // Too close to enemy
+        return false;
+      }
+    }
+    
+    return true;
   }
   private createInteriorMap(buildingType: string): any {
     const width = 15;
