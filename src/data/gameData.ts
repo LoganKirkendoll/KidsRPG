@@ -247,7 +247,7 @@ export const createStartingCharacter = (name: string, characterClass: keyof type
       armor: items.find(i => i.id === 'leather_jacket')
     },
     isInParty: true,
-    position: { x: 26 * 32 + 16, y: 26 * 32 + 16 }, // Spawn near Vault 101 exit
+    position: { x: 50 * 32, y: 50 * 32 },
     direction: 'down' as const,
     isMoving: false,
     sprite: classData.sprite,
