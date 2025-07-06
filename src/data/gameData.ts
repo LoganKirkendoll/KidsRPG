@@ -1,4 +1,6 @@
 import { Character, Skill, Item, Enemy, GameMap, Quest, Achievement, NPC } from '../types/game';
+import { maps } from './maps';
+import { allQuests } from './quests';
 
 export const characterClasses = {
   warrior: {
@@ -271,6 +273,153 @@ export const items: Item[] = [
     stackable: true
   }
 ];
+
+// Add new items for the expanded world
+export const additionalItems: Item[] = [
+  // Alien Technology
+  {
+    id: 'alien_blaster',
+    name: 'Alien Blaster',
+    type: 'weapon',
+    rarity: 'legendary',
+    description: 'An otherworldly energy weapon of unknown origin',
+    stats: { damage: 50, criticalChance: 25, intelligence: 2 },
+    value: 2000,
+    sprite: 'alien_blaster',
+    stackable: false
+  },
+  {
+    id: 'alien_power_cell',
+    name: 'Alien Power Cell',
+    type: 'material',
+    rarity: 'rare',
+    description: 'Advanced alien energy storage device',
+    quantity: 1,
+    value: 100,
+    sprite: 'alien_power_cell',
+    stackable: true
+  },
+  
+  // Vault-Tec Equipment
+  {
+    id: 'pip_boy',
+    name: 'Pip-Boy 3000',
+    type: 'accessory',
+    rarity: 'epic',
+    description: 'Personal Information Processor from Vault-Tec',
+    stats: { intelligence: 3, perception: 2 },
+    value: 1500,
+    sprite: 'pip_boy',
+    stackable: false
+  },
+  {
+    id: 'vault_suit',
+    name: 'Vault 101 Jumpsuit',
+    type: 'armor',
+    rarity: 'uncommon',
+    description: 'Standard issue Vault-Tec jumpsuit',
+    stats: { defense: 3, endurance: 1 },
+    value: 50,
+    sprite: 'vault_suit',
+    stackable: false
+  },
+  
+  // Brotherhood Technology
+  {
+    id: 'brotherhood_armor',
+    name: 'Brotherhood Combat Armor',
+    type: 'armor',
+    rarity: 'rare',
+    description: 'Advanced combat armor used by the Brotherhood of Steel',
+    stats: { defense: 18, strength: 2, endurance: 3 },
+    value: 400,
+    sprite: 'brotherhood_armor',
+    stackable: false
+  },
+  {
+    id: 'laser_rifle',
+    name: 'Laser Rifle',
+    type: 'weapon',
+    rarity: 'rare',
+    description: 'Military-grade energy weapon',
+    stats: { damage: 28, criticalChance: 15, intelligence: 1 },
+    value: 300,
+    sprite: 'laser_rifle',
+    stackable: false
+  },
+  
+  // Enclave Equipment
+  {
+    id: 'enclave_armor',
+    name: 'Enclave Power Armor',
+    type: 'armor',
+    rarity: 'epic',
+    description: 'Advanced power armor used by Enclave forces',
+    stats: { defense: 30, strength: 6, endurance: 6, agility: -3 },
+    value: 1500,
+    sprite: 'enclave_armor',
+    stackable: false
+  },
+  
+  // Special Quest Items
+  {
+    id: 'geck',
+    name: 'G.E.C.K.',
+    type: 'quest',
+    rarity: 'legendary',
+    description: 'Garden of Eden Creation Kit - the key to Project Purity',
+    value: 0,
+    sprite: 'geck',
+    stackable: false
+  },
+  {
+    id: 'declaration_independence',
+    name: 'Declaration of Independence',
+    type: 'quest',
+    rarity: 'legendary',
+    description: 'The founding document of the United States of America',
+    value: 0,
+    sprite: 'declaration',
+    stackable: false
+  },
+  {
+    id: 'water_chip',
+    name: 'Water Chip',
+    type: 'quest',
+    rarity: 'epic',
+    description: 'Essential component for water purification systems',
+    value: 0,
+    sprite: 'water_chip',
+    stackable: false
+  },
+  
+  // Consumables
+  {
+    id: 'nuka_cola',
+    name: 'Nuka-Cola',
+    type: 'consumable',
+    rarity: 'common',
+    description: 'The refreshing taste of the old world',
+    quantity: 1,
+    value: 15,
+    sprite: 'nuka_cola',
+    stackable: true
+  },
+  {
+    id: 'purified_water',
+    name: 'Purified Water',
+    type: 'consumable',
+    rarity: 'uncommon',
+    description: 'Clean, radiation-free water',
+    quantity: 1,
+    value: 25,
+    sprite: 'purified_water',
+    stackable: true
+  }
+];
+
+// Combine original items with additional items
+items.push(...additionalItems);
 
 export const skills: Skill[] = [
   // Warrior Skills
@@ -1010,194 +1159,8 @@ export const createStartingCharacter = (name: string, characterClass: keyof type
 };
 
 export const createStartingMap = (): GameMap => {
-  const width = 100;
-  const height = 100;
-  const tiles = [];
-  
-  for (let y = 0; y < height; y++) {
-    const row = [];
-    for (let x = 0; x < width; x++) {
-      const random = Math.random();
-      let type: any = 'grass';
-      let description = 'Wasteland grass';
-      let walkable = true;
-      
-      if (random < 0.05) {
-        type = 'building';
-        description = 'Abandoned building';
-        walkable = false;
-      } else if (random < 0.1) {
-        type = 'dirt';
-        description = 'Barren wasteland soil';
-      } else if (random < 0.15) {
-        type = 'stone';
-        description = 'Rocky outcropping';
-      } else if (random < 0.18) {
-        type = 'water';
-        description = 'Irradiated water';
-        walkable = false;
-      } else if (random < 0.25) {
-        type = 'ruins';
-        description = 'Pre-war ruins';
-      }
-      
-      row.push({
-        x,
-        y,
-        type,
-        walkable,
-        sprite: type,
-        discovered: false,
-        visible: false,
-        description
-      });
-    }
-    tiles.push(row);
-  }
-  
-  // Create buildings and structures
-  const buildings = [
-    { x: 20, y: 20, width: 5, height: 5, type: 'vault_entrance', name: 'Vault 101' },
-    { x: 60, y: 30, width: 4, height: 4, type: 'clinic', name: 'Medical Clinic' },
-    { x: 40, y: 70, width: 6, height: 4, type: 'workshop', name: 'Mechanic\'s Workshop' },
-    { x: 80, y: 80, width: 8, height: 6, type: 'settlement', name: 'Haven Settlement' },
-    { x: 10, y: 85, width: 3, height: 3, type: 'trader_post', name: 'Trading Post' },
-    { x: 75, y: 15, width: 4, height: 4, type: 'tech_facility', name: 'Old Tech Facility' }
-  ];
-  
-  // Create regions and special areas
-  const regions = [
-    { x: 5, y: 5, width: 3, height: 3, type: 'cave', name: 'Dark Cave' },
-    { x: 90, y: 10, width: 4, height: 2, type: 'tunnel', name: 'Underground Tunnel' },
-    { x: 15, y: 60, width: 6, height: 4, type: 'forest', name: 'Overgrown Forest' },
-    { x: 85, y: 50, width: 5, height: 5, type: 'desert', name: 'Scorched Desert' },
-    { x: 30, y: 10, width: 4, height: 3, type: 'swamp', name: 'Toxic Swamp' },
-    { x: 50, y: 90, width: 3, height: 2, type: 'cave', name: 'Crystal Cave' },
-    { x: 70, y: 70, width: 2, height: 4, type: 'tunnel', name: 'Maintenance Tunnel' }
-  ];
-  
-  // Place buildings
-  buildings.forEach(building => {
-    for (let y = building.y; y < building.y + building.height; y++) {
-      for (let x = building.x; x < building.x + building.width; x++) {
-        if (x < width && y < height) {
-          tiles[y][x].type = 'building';
-          tiles[y][x].walkable = false;
-          tiles[y][x].buildingType = building.type;
-          tiles[y][x].buildingName = building.name;
-          
-          // Create entrance
-          if (x === building.x + Math.floor(building.width / 2) && y === building.y + building.height - 1) {
-            tiles[y][x].walkable = true;
-            tiles[y][x].isEntrance = true;
-          }
-        }
-      }
-    }
-  });
-  
-  // Place regions
-  regions.forEach(region => {
-    for (let y = region.y; y < region.y + region.height; y++) {
-      for (let x = region.x; x < region.x + region.width; x++) {
-        if (x < width && y < height) {
-          // Set appropriate terrain type for region entrance
-          switch (region.type) {
-            case 'cave':
-              tiles[y][x].type = 'stone';
-              tiles[y][x].description = 'Cave entrance';
-              break;
-            case 'tunnel':
-              tiles[y][x].type = 'ruins';
-              tiles[y][x].description = 'Tunnel entrance';
-              break;
-            case 'forest':
-              tiles[y][x].type = 'grass';
-              tiles[y][x].description = 'Forest entrance';
-              break;
-            case 'desert':
-              tiles[y][x].type = 'sand';
-              tiles[y][x].description = 'Desert entrance';
-              break;
-            case 'swamp':
-              tiles[y][x].type = 'water';
-              tiles[y][x].description = 'Swamp entrance';
-              break;
-          }
-          
-          tiles[y][x].walkable = false;
-          tiles[y][x].regionType = region.type;
-          tiles[y][x].regionName = region.name;
-          
-          // Create entrance
-          if (x === region.x + Math.floor(region.width / 2) && y === region.y + region.height - 1) {
-            tiles[y][x].walkable = true;
-            tiles[y][x].isEntrance = true;
-          }
-        }
-      }
-    }
-  });
-  
-  // Add lootable containers
-  const lootables: any[] = [];
-  for (let i = 0; i < 150; i++) {
-    const x = Math.floor(Math.random() * width);
-    const y = Math.floor(Math.random() * height);
-    
-    if (tiles[y][x].walkable && tiles[y][x].type !== 'building' && !tiles[y][x].regionType) {
-      const lootableId = `loot_${i}`;
-      const lootType = Math.random() < 0.3 ? 'corpse' : 'container';
-      
-      // Generate random loot based on type and location
-      const lootItems = [];
-      const numItems = Math.floor(Math.random() * 4) + 1;
-      
-      for (let j = 0; j < numItems; j++) {
-        const randomItem = items[Math.floor(Math.random() * items.length)];
-        lootItems.push({
-          ...randomItem,
-          quantity: randomItem.stackable ? Math.floor(Math.random() * 3) + 1 : 1
-        });
-      }
-      
-      lootables.push({
-        id: lootableId,
-        position: { x: x * 32 + 16, y: y * 32 + 16 },
-        items: lootItems,
-        type: lootType,
-        sprite: lootType,
-        discovered: false,
-        looted: false
-      });
-    }
-  }
-  
-  // Add more enemies to the map
-  const enemies: any[] = [];
-  for (let i = 0; i < 40; i++) {
-    const x = Math.floor(Math.random() * width);
-    const y = Math.floor(Math.random() * height);
-    if (tiles[y][x].walkable && !tiles[y][x].hasNPC && !tiles[y][x].buildingType && !tiles[y][x].regionType) {
-      const enemyTemplate = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-      enemies.push({
-        ...enemyTemplate,
-        id: `${enemyTemplate.id}_${i}`,
-        position: { x: x * 32 + 16, y: y * 32 + 16 }
-      });
-    }
-  }
-  
-  return {
-    width,
-    height,
-    tiles,
-    name: 'Capital Wasteland',
-    bgMusic: 'wasteland_ambient',
-    npcs: [...npcs],
-    enemies,
-    lootables
-  };
+  // Use the new map creation system
+  return maps.capital_wasteland();
 };
 
 export const achievements: Achievement[] = [
@@ -1267,45 +1230,5 @@ export const achievements: Achievement[] = [
 ];
 
 export const quests: Quest[] = [
-  {
-    id: 'first_steps',
-    title: 'First Steps in the Wasteland',
-    description: 'Learn the basics of survival and exploration',
-    objectives: [
-      {
-        id: 'explore_tiles',
-        description: 'Explore and discover 10 new areas',
-        type: 'explore',
-        target: 'tiles',
-        current: 0,
-        required: 10,
-        completed: false
-      },
-      {
-        id: 'talk_to_npc',
-        description: 'Talk to an NPC',
-        type: 'talk',
-        target: 'npc',
-        current: 0,
-        required: 1,
-        completed: false
-      },
-      {
-        id: 'collect_items',
-        description: 'Collect 3 items from containers',
-        type: 'collect',
-        target: 'items',
-        current: 0,
-        required: 3,
-        completed: false
-      }
-    ],
-    rewards: [
-      { type: 'experience', value: 100 },
-      { type: 'gold', value: 50 },
-      { type: 'item', value: 1, item: items.find(i => i.id === 'combat_knife') }
-    ],
-    status: 'active',
-    requiredLevel: 1
-  }
+  ...allQuests.filter(q => q.status === 'active')
 ];

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { GameState, Character, GameSettings, Item, DialogueChoice, Quest } from '../types/game';
-import { createStartingCharacter, createStartingMap, achievements, quests, items } from '../data/gameData';
+import { createStartingCharacter, createStartingMap, achievements, items } from '../data/gameData';
+import { allQuests } from '../data/quests';
 import { SaveSystem } from '../engine/SaveSystem';
 
 export const useGameState = () => {
@@ -88,7 +89,7 @@ export const useGameState = () => {
         goldSpent: 0
       },
       visibilityMap: [],
-      quests: [quests[0]], // Start with the first quest active
+      quests: [allQuests.find(q => q.id === 'escape_vault_101')!], // Start with the escape quest
       devMode: {
         enabled: false,
         selectedTool: 'quest',

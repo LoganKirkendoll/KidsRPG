@@ -135,6 +135,7 @@ export interface Enemy {
   id: string;
   name: string;
   type: 'raider' | 'mutant' | 'robot' | 'beast' | 'boss';
+  mapId?: string;
   level: number;
   health: number;
   maxHealth: number;
@@ -157,6 +158,7 @@ export interface NPC {
   id: string;
   name: string;
   type: 'trader' | 'quest_giver' | 'recruitable' | 'neutral';
+  mapId?: string;
   position: Position;
   sprite: string;
   dialogue: DialogueNode[];
