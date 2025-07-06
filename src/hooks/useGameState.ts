@@ -48,7 +48,7 @@ export const useGameState = () => {
       inventory: startingInventory,
       gold: 100,
       currentMap: startingMap,
-      availableMaps: {}, // Maps will be loaded on demand
+      availableMaps: { capital_wasteland: startingMap }, // Keep at least the starting map
       mapPosition: { x: 25, y: 25 },
       camera: { x: 0, y: 0 },
       gameTime: 0,

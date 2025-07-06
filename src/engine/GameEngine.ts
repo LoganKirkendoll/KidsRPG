@@ -286,12 +286,6 @@ export class GameEngine {
       }
     }
     
-    // Store previous map
-    this.gameState.previousMap = {
-      map: this.gameState.currentMap,
-      position: { ...this.gameState.player.position }
-    };
-    
     // Unload previous map to save memory (keep only current and adjacent)
     const currentMapId = this.gameState.currentMap.id;
     Object.keys(this.loadedMaps).forEach(mapId => {
@@ -312,6 +306,9 @@ export class GameEngine {
     
     // Notify state change
     this.notifyStateChange();
+    
+    // Prevent further movement processing this frame
+    return;
   }
 
   private isValidPosition(tileX: number, tileY: number): boolean {
