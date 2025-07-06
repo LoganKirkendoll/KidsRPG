@@ -1065,6 +1065,17 @@ export const createStartingMap = (): GameMap => {
     { x: 75, y: 15, width: 4, height: 4, type: 'tech_facility', name: 'Old Tech Facility' }
   ];
   
+  // Create regions and special areas
+  const regions = [
+    { x: 5, y: 5, width: 3, height: 3, type: 'cave', name: 'Dark Cave' },
+    { x: 90, y: 10, width: 4, height: 2, type: 'tunnel', name: 'Underground Tunnel' },
+    { x: 15, y: 60, width: 6, height: 4, type: 'forest', name: 'Overgrown Forest' },
+    { x: 85, y: 50, width: 5, height: 5, type: 'desert', name: 'Scorched Desert' },
+    { x: 30, y: 10, width: 4, height: 3, type: 'swamp', name: 'Toxic Swamp' },
+    { x: 50, y: 90, width: 3, height: 2, type: 'cave', name: 'Crystal Cave' },
+    { x: 70, y: 70, width: 2, height: 4, type: 'tunnel', name: 'Maintenance Tunnel' }
+  ];
+  
   // Place buildings
   buildings.forEach(building => {
     for (let y = building.y; y < building.y + building.height; y++) {
@@ -1085,13 +1096,56 @@ export const createStartingMap = (): GameMap => {
     }
   });
   
+  // Place regions
+  regions.forEach(region => {
+    for (let y = region.y; y < region.y + region.height; y++) {
+      for (let x = region.x; x < region.x + region.width; x++) {
+        if (x < width && y < height) {
+          // Set appropriate terrain type for region entrance
+          switch (region.type) {
+            case 'cave':
+              tiles[y][x].type = 'stone';
+              tiles[y][x].description = 'Cave entrance';
+              break;
+            case 'tunnel':
+              tiles[y][x].type = 'ruins';
+              tiles[y][x].description = 'Tunnel entrance';
+              break;
+            case 'forest':
+              tiles[y][x].type = 'grass';
+              tiles[y][x].description = 'Forest entrance';
+              break;
+            case 'desert':
+              tiles[y][x].type = 'sand';
+              tiles[y][x].description = 'Desert entrance';
+              break;
+            case 'swamp':
+              tiles[y][x].type = 'water';
+              tiles[y][x].description = 'Swamp entrance';
+              break;
+          }
+          
+          tiles[y][x].walkable = false;
+          tiles[y][x].regionType = region.type;
+          tiles[y][x].regionName = region.name;
+          
+          // Create entrance
+          if (x === region.x + Math.floor(region.width / 2) && y === region.y + region.height - 1) {
+            tiles[y][x].walkable = true;
+            tiles[y][x].isEntrance = true;
+          }
+        }
+      }
+    }
+  });
+  
   // Add lootable containers
   const lootables: any[] = [];
   for (let i = 0; i < 150; i++) {
     const x = Math.floor(Math.random() * width);
     const y = Math.floor(Math.random() * height);
     
-    if (tiles[y][x].walkable && tiles[y][x].type !== 'building') {
+    if (tiles[y][x].walkable && tiles[y][x].type !== 'building' && !tiles[y][x].regionType) {
       const lootableId = `loot_${i}`;
       const lootType = Math.random() < 0.3 ? 'corpse' : 'container';
       
@@ -1124,7 +1178,7 @@ export const createStartingMap = (): GameMap => {
   for (let i = 0; i < 40; i++) {
     const x = Math.floor(Math.random() * width);
     const y = Math.floor(Math.random() * height);
-    if (tiles[y][x].walkable && !tiles[y][x].hasNPC) {
+    if (tiles[y][x].walkable && !tiles[y][x].hasNPC && !tiles[y][x].buildingType && !tiles[y][x].regionType) {
       const enemyTemplate = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
       enemies.push({
         ...enemyTemplate,

@@ -180,8 +180,12 @@ export class GameEngine {
     const tileY = Math.floor(y / 32);
     const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
     
-    if (tile?.isEntrance && tile.buildingType) {
-      this.enterBuilding(tile.buildingType, tile.buildingName);
+    if (tile?.isEntrance && (tile.buildingType || tile.regionType)) {
+      if (tile.buildingType) {
+        this.enterBuilding(tile.buildingType, tile.buildingName);
+      } else if (tile.regionType) {
+        this.enterRegion(tile.regionType, tile.regionName);
+      }
       return;
     }
 
@@ -243,6 +247,24 @@ export class GameEngine {
     this.notifyStateChange();
   }
 
+  private enterRegion(regionType: string, regionName?: string) {
+    // Create a new region map
+    const regionMap = this.createRegionMap(regionType);
+    
+    // Store the current map position
+    this.gameState.previousMap = {
+      map: this.gameState.currentMap,
+      position: { ...this.gameState.player.position }
+    };
+    
+    // Switch to region
+    this.gameState.currentMap = regionMap;
+    this.gameState.player.position = { x: 160, y: 280 }; // Near the entrance
+    
+    this.updateCamera();
+    this.updateVisibility();
+    this.notifyStateChange();
+  }
   private createInteriorMap(buildingType: string): any {
     const width = 15;
     const height = 10;
@@ -263,7 +285,7 @@ export class GameEngine {
         // Create entrance at bottom center
         if (x === Math.floor(width / 2) && y === height - 1) {
           walkable = true;
-          type = 'grass'; // Exit tile
+          type = 'building'; // Exit tile
         }
         
         row.push({
@@ -274,7 +296,8 @@ export class GameEngine {
           sprite: type,
           discovered: true,
           visible: true,
-          description: 'Interior floor'
+          description: 'Interior floor',
+          isExit: x === Math.floor(width / 2) && y === height - 1
         });
       }
       tiles.push(row);
@@ -348,6 +371,162 @@ export class GameEngine {
     };
   }
 
+  private createRegionMap(regionType: string): any {
+    let width = 50;
+    let height = 50;
+    let tiles = [];
+    
+    // Create region-specific terrain
+    for (let y = 0; y < height; y++) {
+      const row = [];
+      for (let x = 0; x < width; x++) {
+        let type = 'grass';
+        let walkable = true;
+        let description = 'Unknown terrain';
+        
+        // Create walls around the edges for caves and tunnels
+        if ((regionType === 'cave' || regionType === 'tunnel') && 
+            (x === 0 || x === width - 1 || y === 0 || y === height - 1)) {
+          type = 'stone';
+          walkable = false;
+          description = 'Rock wall';
+        } else {
+          // Set terrain based on region type
+          const random = Math.random();
+          switch (regionType) {
+            case 'cave':
+              type = random < 0.1 ? 'water' : random < 0.3 ? 'stone' : 'dirt';
+              description = type === 'water' ? 'Underground pool' : 
+                           type === 'stone' ? 'Cave wall' : 'Cave floor';
+              if (type === 'stone') walkable = false;
+              break;
+            case 'tunnel':
+              type = random < 0.05 ? 'stone' : 'dirt';
+              description = type === 'stone' ? 'Tunnel wall' : 'Tunnel floor';
+              if (type === 'stone') walkable = false;
+              break;
+            case 'forest':
+              type = random < 0.2 ? 'ruins' : random < 0.1 ? 'water' : 'grass';
+              description = type === 'ruins' ? 'Overgrown ruins' : 
+                           type === 'water' ? 'Forest stream' : 'Forest floor';
+              if (type === 'water') walkable = false;
+              break;
+            case 'desert':
+              type = random < 0.1 ? 'stone' : random < 0.05 ? 'ruins' : 'sand';
+              description = type === 'stone' ? 'Desert rock' : 
+                           type === 'ruins' ? 'Desert ruins' : 'Desert sand';
+              if (type === 'stone') walkable = false;
+              break;
+            case 'swamp':
+              type = random < 0.4 ? 'water' : random < 0.2 ? 'ruins' : 'grass';
+              description = type === 'water' ? 'Swamp water' : 
+                           type === 'ruins' ? 'Sunken ruins' : 'Swamp ground';
+              if (type === 'water') walkable = false;
+              break;
+          }
+        }
+        
+        // Create entrance at bottom center
+        if (x === Math.floor(width / 2) && y === height - 1) {
+          walkable = true;
+          type = regionType === 'cave' || regionType === 'tunnel' ? 'dirt' : type;
+        }
+        
+        row.push({
+          x,
+          y,
+          type,
+          walkable,
+          sprite: type,
+          discovered: true,
+          visible: true,
+          description,
+          isExit: x === Math.floor(width / 2) && y === height - 1
+        });
+      }
+      tiles.push(row);
+    }
+    
+    // Add region-specific content
+    const npcs: any[] = [];
+    const lootables: any[] = [];
+    const enemies: any[] = [];
+    
+    // Add enemies based on region type
+    const enemyCount = Math.floor(Math.random() * 8) + 3;
+    for (let i = 0; i < enemyCount; i++) {
+      const x = Math.floor(Math.random() * (width - 4)) + 2;
+      const y = Math.floor(Math.random() * (height - 4)) + 2;
+      
+      if (tiles[y][x].walkable) {
+        let enemyTemplate;
+        switch (regionType) {
+          case 'cave':
+          case 'tunnel':
+            enemyTemplate = enemyTypes[Math.random() < 0.6 ? 1 : 2]; // Mutants or robots
+            break;
+          case 'forest':
+          case 'swamp':
+            enemyTemplate = enemyTypes[Math.random() < 0.7 ? 0 : 1]; // Raiders or mutants
+            break;
+          case 'desert':
+            enemyTemplate = enemyTypes[Math.random() < 0.5 ? 0 : 3]; // Raiders or bosses
+            break;
+          default:
+            enemyTemplate = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+        }
+        
+        enemies.push({
+          ...enemyTemplate,
+          id: `${enemyTemplate.id}_${regionType}_${i}`,
+          position: { x: x * 32 + 16, y: y * 32 + 16 }
+        });
+      }
+    }
+    
+    // Add lootables
+    const lootableCount = Math.floor(Math.random() * 6) + 2;
+    for (let i = 0; i < lootableCount; i++) {
+      const x = Math.floor(Math.random() * (width - 4)) + 2;
+      const y = Math.floor(Math.random() * (height - 4)) + 2;
+      
+      if (tiles[y][x].walkable) {
+        const lootType = Math.random() < 0.4 ? 'corpse' : 'container';
+        const lootItems = [];
+        const numItems = Math.floor(Math.random() * 3) + 1;
+        
+        for (let j = 0; j < numItems; j++) {
+          const randomItem = items[Math.floor(Math.random() * items.length)];
+          lootItems.push({
+            ...randomItem,
+            quantity: randomItem.stackable ? Math.floor(Math.random() * 3) + 1 : 1
+          });
+        }
+        
+        lootables.push({
+          id: `${regionType}_loot_${i}`,
+          position: { x: x * 32 + 16, y: y * 32 + 16 },
+          items: lootItems,
+          type: lootType,
+          sprite: lootType,
+          discovered: true,
+          looted: false
+        });
+      }
+    }
+    
+    return {
+      width,
+      height,
+      tiles,
+      name: `${regionType.charAt(0).toUpperCase() + regionType.slice(1)} Region`,
+      bgMusic: `${regionType}_ambient`,
+      npcs,
+      enemies,
+      lootables,
+      isInterior: true
+    };
+  }
   private handleInteraction() {
     const playerPos = this.gameState.player.position;
     
@@ -357,7 +536,7 @@ export class GameEngine {
       const tileY = Math.floor(playerPos.y / 32);
       const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
       
-      if (tile?.type === 'grass' && this.gameState.previousMap) {
+      if (tile?.isExit && this.gameState.previousMap) {
         // Exit building
         this.gameState.currentMap = this.gameState.previousMap.map;
         this.gameState.player.position = this.gameState.previousMap.position;
@@ -375,8 +554,12 @@ export class GameEngine {
     const tileY = Math.floor(playerPos.y / 32);
     const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
     
-    if (tile?.isEntrance && tile.buildingType) {
-      this.enterBuilding(tile.buildingType, tile.buildingName);
+    if (tile?.isEntrance && (tile.buildingType || tile.regionType)) {
+      if (tile.buildingType) {
+        this.enterBuilding(tile.buildingType, tile.buildingName);
+      } else if (tile.regionType) {
+        this.enterRegion(tile.regionType, tile.regionName);
+      }
       return;
     }
 
@@ -1056,11 +1239,12 @@ export class GameEngine {
           this.ctx.fillStyle = '#ffff00';
           this.ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
           
-          if (tile.buildingName) {
+          const name = tile.buildingName || tile.regionName;
+          if (name) {
             this.ctx.fillStyle = '#ffffff';
             this.ctx.font = '10px Arial';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText(tile.buildingName, screenX + 16, screenY - 5);
+            this.ctx.fillText(name, screenX + 16, screenY - 5);
           }
         }
       }

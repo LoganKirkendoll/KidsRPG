@@ -217,7 +217,10 @@ export interface Tile {
   description?: string;
   buildingType?: string;
   buildingName?: string;
+  regionType?: string;
+  regionName?: string;
   isEntrance?: boolean;
+  isExit?: boolean;
 }
 
 export interface GameMap {
