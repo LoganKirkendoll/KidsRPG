@@ -108,26 +108,26 @@ export const createCapitalWasteland = (): GameMap => {
     {
       direction: 'north',
       targetMapId: 'northern_wasteland',
-      fromPosition: { x: 30 * 32, y: 0 },
-      toPosition: { x: 30 * 32, y: 59 * 32 }
+      fromPosition: { x: 30 * 32, y: -16 },
+      toPosition: { x: 30 * 32, y: 58 * 32 }
     },
     {
       direction: 'south',
       targetMapId: 'southern_ruins',
-      fromPosition: { x: 30 * 32, y: 59 * 32 },
-      toPosition: { x: 30 * 32, y: 0 }
+      fromPosition: { x: 30 * 32, y: 60 * 32 },
+      toPosition: { x: 30 * 32, y: 32 }
     },
     {
       direction: 'east',
       targetMapId: 'eastern_districts',
-      fromPosition: { x: 59 * 32, y: 30 * 32 },
-      toPosition: { x: 0, y: 30 * 32 }
+      fromPosition: { x: 60 * 32, y: 30 * 32 },
+      toPosition: { x: 32, y: 30 * 32 }
     },
     {
       direction: 'west',
       targetMapId: 'western_outskirts',
-      fromPosition: { x: 0, y: 30 * 32 },
-      toPosition: { x: 59 * 32, y: 30 * 32 }
+      fromPosition: { x: -16, y: 30 * 32 },
+      toPosition: { x: 58 * 32, y: 30 * 32 }
     }
   ];
   
@@ -177,14 +177,14 @@ export const createNorthernWasteland = (): GameMap => {
     {
       direction: 'south',
       targetMapId: 'capital_wasteland',
-      fromPosition: { x: 30 * 32, y: 59 * 32 },
-      toPosition: { x: 30 * 32, y: 0 }
+      fromPosition: { x: 30 * 32, y: 60 * 32 },
+      toPosition: { x: 30 * 32, y: 32 }
     },
     {
       direction: 'north',
       targetMapId: 'the_pitt',
-      fromPosition: { x: 30 * 32, y: 0 },
-      toPosition: { x: 30 * 32, y: 59 * 32 }
+      fromPosition: { x: 30 * 32, y: -16 },
+      toPosition: { x: 25 * 32, y: 38 * 32 }
     }
   ];
   
@@ -235,14 +235,14 @@ export const createSouthernRuins = (): GameMap => {
     {
       direction: 'north',
       targetMapId: 'capital_wasteland',
-      fromPosition: { x: 30 * 32, y: 0 },
-      toPosition: { x: 30 * 32, y: 59 * 32 }
+      fromPosition: { x: 30 * 32, y: -16 },
+      toPosition: { x: 30 * 32, y: 58 * 32 }
     },
     {
       direction: 'south',
       targetMapId: 'point_lookout',
-      fromPosition: { x: 30 * 32, y: 59 * 32 },
-      toPosition: { x: 30 * 32, y: 0 }
+      fromPosition: { x: 30 * 32, y: 60 * 32 },
+      toPosition: { x: 22 * 32, y: 32 }
     }
   ];
   
@@ -293,14 +293,14 @@ export const createEasternDistricts = (): GameMap => {
     {
       direction: 'west',
       targetMapId: 'capital_wasteland',
-      fromPosition: { x: 0, y: 30 * 32 },
-      toPosition: { x: 59 * 32, y: 30 * 32 }
+      fromPosition: { x: -16, y: 30 * 32 },
+      toPosition: { x: 58 * 32, y: 30 * 32 }
     },
     {
       direction: 'east',
       targetMapId: 'citadel',
-      fromPosition: { x: 59 * 32, y: 30 * 32 },
-      toPosition: { x: 0, y: 30 * 32 }
+      fromPosition: { x: 60 * 32, y: 30 * 32 },
+      toPosition: { x: 32, y: 20 * 32 }
     }
   ];
   
@@ -350,14 +350,14 @@ export const createWesternOutskirts = (): GameMap => {
     {
       direction: 'east',
       targetMapId: 'capital_wasteland',
-      fromPosition: { x: 59 * 32, y: 30 * 32 },
-      toPosition: { x: 0, y: 30 * 32 }
+      fromPosition: { x: 60 * 32, y: 30 * 32 },
+      toPosition: { x: 32, y: 30 * 32 }
     },
     {
       direction: 'west',
       targetMapId: 'metro_tunnels',
-      fromPosition: { x: 0, y: 30 * 32 },
-      toPosition: { x: 59 * 32, y: 30 * 32 }
+      fromPosition: { x: -16, y: 30 * 32 },
+      toPosition: { x: 58 * 32, y: 20 * 32 }
     }
   ];
   
@@ -406,8 +406,8 @@ export const createThePitt = (): GameMap => {
     {
       direction: 'south',
       targetMapId: 'northern_wasteland',
-      fromPosition: { x: 25 * 32, y: 39 * 32 },
-      toPosition: { x: 30 * 32, y: 0 }
+      fromPosition: { x: 25 * 32, y: 40 * 32 },
+      toPosition: { x: 30 * 32, y: 32 }
     }
   ];
   
@@ -457,8 +457,8 @@ export const createPointLookout = (): GameMap => {
     {
       direction: 'north',
       targetMapId: 'southern_ruins',
-      fromPosition: { x: 22 * 32, y: 0 },
-      toPosition: { x: 30 * 32, y: 59 * 32 }
+      fromPosition: { x: 22 * 32, y: -16 },
+      toPosition: { x: 30 * 32, y: 58 * 32 }
     }
   ];
   
@@ -504,8 +504,8 @@ export const createCitadel = (): GameMap => {
     {
       direction: 'west',
       targetMapId: 'eastern_districts',
-      fromPosition: { x: 0, y: 20 * 32 },
-      toPosition: { x: 59 * 32, y: 30 * 32 }
+      fromPosition: { x: -16, y: 20 * 32 },
+      toPosition: { x: 58 * 32, y: 30 * 32 }
     }
   ];
   
@@ -555,8 +555,8 @@ export const createMetroTunnels = (): GameMap => {
     {
       direction: 'east',
       targetMapId: 'western_outskirts',
-      fromPosition: { x: 59 * 32, y: 20 * 32 },
-      toPosition: { x: 0, y: 30 * 32 }
+      fromPosition: { x: 60 * 32, y: 20 * 32 },
+      toPosition: { x: 32, y: 30 * 32 }
     }
   ];
   
