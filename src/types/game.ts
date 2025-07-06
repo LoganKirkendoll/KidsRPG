@@ -230,11 +230,20 @@ export interface GameMap {
   height: number;
   tiles: Tile[][];
   name: string;
+  id: string;
   bgMusic: string;
   npcs: NPC[];
   enemies: Enemy[];
   lootables: LootableItem[];
   isInterior?: boolean;
+  connections: MapConnection[];
+}
+
+export interface MapConnection {
+  direction: 'north' | 'south' | 'east' | 'west';
+  targetMapId: string;
+  fromPosition: Position;
+  toPosition: Position;
 }
 
 export interface DevMode {
@@ -334,6 +343,7 @@ export interface GameState {
     map: GameMap;
     position: Position;
   };
+  availableMaps: { [key: string]: GameMap };
   mapPosition: Position;
   camera: Position;
   gameTime: number;

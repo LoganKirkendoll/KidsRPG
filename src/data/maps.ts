@@ -1,6 +1,6 @@
-import { GameMap, Tile, NPC, Enemy, LootableItem } from '../types/game';
-import { items } from './gameData';
-import { npcs } from './npcs';
+import { GameMap, Tile, NPC, Enemy, LootableItem, MapConnection } from '../types/game';
+import { items } from './items_data';
+import { npcs } from './npcs_data';
 import { enemies } from './enemies';
 
 export const createTile = (x: number, y: number, type: string, walkable: boolean = true): Tile => ({
@@ -75,10 +75,10 @@ export const createLootables = (width: number, height: number, density: number =
   return lootables;
 };
 
-// CAPITAL WASTELAND - Starting area
+// CAPITAL WASTELAND - Starting area (reduced size)
 export const createCapitalWasteland = (): GameMap => {
-  const width = 120;
-  const height = 120;
+  const width = 60;
+  const height = 60;
   const tiles: Tile[][] = [];
   
   // Generate base terrain
@@ -102,29 +102,283 @@ export const createCapitalWasteland = (): GameMap => {
   // Create settlements and buildings
   createBuilding(tiles, 15, 15, 8, 6, 'vault', 'Vault 101');
   createBuilding(tiles, 40, 20, 6, 4, 'settlement', 'Megaton');
-  createBuilding(tiles, 70, 30, 4, 3, 'clinic', 'Doc Church\'s Clinic');
-  createBuilding(tiles, 25, 50, 5, 4, 'trader_post', 'Craterside Supply');
-  createBuilding(tiles, 80, 80, 10, 8, 'city', 'Rivet City');
-  createBuilding(tiles, 10, 90, 6, 5, 'brotherhood', 'Brotherhood Outpost');
-  createBuilding(tiles, 100, 20, 7, 5, 'enclave', 'Enclave Facility');
-  createBuilding(tiles, 50, 70, 4, 4, 'workshop', 'Scrapyard');
+  createBuilding(tiles, 25, 45, 5, 4, 'trader_post', 'Craterside Supply');
+  
+  const connections: MapConnection[] = [
+    {
+      direction: 'north',
+      targetMapId: 'northern_wasteland',
+      fromPosition: { x: 30 * 32, y: 0 },
+      toPosition: { x: 30 * 32, y: 59 * 32 }
+    },
+    {
+      direction: 'south',
+      targetMapId: 'southern_ruins',
+      fromPosition: { x: 30 * 32, y: 59 * 32 },
+      toPosition: { x: 30 * 32, y: 0 }
+    },
+    {
+      direction: 'east',
+      targetMapId: 'eastern_districts',
+      fromPosition: { x: 59 * 32, y: 30 * 32 },
+      toPosition: { x: 0, y: 30 * 32 }
+    },
+    {
+      direction: 'west',
+      targetMapId: 'western_outskirts',
+      fromPosition: { x: 0, y: 30 * 32 },
+      toPosition: { x: 59 * 32, y: 30 * 32 }
+    }
+  ];
   
   return {
+    id: 'capital_wasteland',
     width,
     height,
     tiles,
     name: 'Capital Wasteland',
     bgMusic: 'wasteland_ambient',
-    npcs: npcs.filter(npc => npc.mapId === 'capital_wasteland'),
-    enemies: enemies.filter(enemy => enemy.mapId === 'capital_wasteland'),
-    lootables: createLootables(width, height)
+    npcs: npcs.filter(npc => !npc.mapId || npc.mapId === 'capital_wasteland'),
+    enemies: enemies.filter(enemy => !enemy.mapId || enemy.mapId === 'capital_wasteland'),
+    lootables: createLootables(width, height),
+    connections
   };
 };
 
-// THE PITT - Industrial wasteland
+// NORTHERN WASTELAND - Industrial area
+export const createNorthernWasteland = (): GameMap => {
+  const width = 60;
+  const height = 60;
+  const tiles: Tile[][] = [];
+  
+  for (let y = 0; y < height; y++) {
+    const row: Tile[] = [];
+    for (let x = 0; x < width; x++) {
+      const random = Math.random();
+      let type = 'dirt';
+      let walkable = true;
+      
+      if (random < 0.2) type = 'ruins';
+      else if (random < 0.3) type = 'stone';
+      else if (random < 0.35) { type = 'water'; walkable = false; }
+      else if (random < 0.4) type = 'building';
+      
+      row.push(createTile(x, y, type, walkable));
+    }
+    tiles.push(row);
+  }
+  
+  // Industrial buildings
+  createBuilding(tiles, 20, 20, 12, 8, 'factory', 'Old Factory');
+  createBuilding(tiles, 40, 35, 8, 6, 'power_plant', 'Power Station');
+  createBuilding(tiles, 10, 45, 6, 4, 'warehouse', 'Supply Depot');
+  
+  const connections: MapConnection[] = [
+    {
+      direction: 'south',
+      targetMapId: 'capital_wasteland',
+      fromPosition: { x: 30 * 32, y: 59 * 32 },
+      toPosition: { x: 30 * 32, y: 0 }
+    },
+    {
+      direction: 'north',
+      targetMapId: 'the_pitt',
+      fromPosition: { x: 30 * 32, y: 0 },
+      toPosition: { x: 30 * 32, y: 59 * 32 }
+    }
+  ];
+  
+  return {
+    id: 'northern_wasteland',
+    width,
+    height,
+    tiles,
+    name: 'Northern Wasteland',
+    bgMusic: 'industrial_ambient',
+    npcs: npcs.filter(npc => npc.mapId === 'northern_wasteland'),
+    enemies: enemies.filter(enemy => enemy.mapId === 'northern_wasteland'),
+    lootables: createLootables(width, height, 0.03),
+    connections
+  };
+};
+
+// SOUTHERN RUINS - Urban decay
+export const createSouthernRuins = (): GameMap => {
+  const width = 60;
+  const height = 60;
+  const tiles: Tile[][] = [];
+  
+  for (let y = 0; y < height; y++) {
+    const row: Tile[] = [];
+    for (let x = 0; x < width; x++) {
+      const random = Math.random();
+      let type = 'ruins';
+      let walkable = true;
+      
+      if (random < 0.3) type = 'building';
+      else if (random < 0.4) type = 'stone';
+      else if (random < 0.5) type = 'dirt';
+      
+      if (type === 'building' && Math.random() < 0.7) walkable = false;
+      
+      row.push(createTile(x, y, type, walkable));
+    }
+    tiles.push(row);
+  }
+  
+  // Urban ruins
+  createBuilding(tiles, 15, 15, 10, 8, 'city_hall', 'Ruined City Hall');
+  createBuilding(tiles, 35, 25, 8, 6, 'hospital', 'Abandoned Hospital');
+  createBuilding(tiles, 45, 45, 6, 4, 'school', 'Old School');
+  
+  const connections: MapConnection[] = [
+    {
+      direction: 'north',
+      targetMapId: 'capital_wasteland',
+      fromPosition: { x: 30 * 32, y: 0 },
+      toPosition: { x: 30 * 32, y: 59 * 32 }
+    },
+    {
+      direction: 'south',
+      targetMapId: 'point_lookout',
+      fromPosition: { x: 30 * 32, y: 59 * 32 },
+      toPosition: { x: 30 * 32, y: 0 }
+    }
+  ];
+  
+  return {
+    id: 'southern_ruins',
+    width,
+    height,
+    tiles,
+    name: 'Southern Ruins',
+    bgMusic: 'ruins_ambient',
+    npcs: npcs.filter(npc => npc.mapId === 'southern_ruins'),
+    enemies: enemies.filter(enemy => enemy.mapId === 'southern_ruins'),
+    lootables: createLootables(width, height, 0.04),
+    connections
+  };
+};
+
+// EASTERN DISTRICTS - Commercial area
+export const createEasternDistricts = (): GameMap => {
+  const width = 60;
+  const height = 60;
+  const tiles: Tile[][] = [];
+  
+  for (let y = 0; y < height; y++) {
+    const row: Tile[] = [];
+    for (let x = 0; x < width; x++) {
+      const random = Math.random();
+      let type = 'stone';
+      let walkable = true;
+      
+      if (random < 0.3) type = 'building';
+      else if (random < 0.4) type = 'ruins';
+      else if (random < 0.5) type = 'grass';
+      
+      if (type === 'building' && Math.random() < 0.6) walkable = false;
+      
+      row.push(createTile(x, y, type, walkable));
+    }
+    tiles.push(row);
+  }
+  
+  // Commercial buildings
+  createBuilding(tiles, 20, 20, 15, 10, 'rivet_city', 'Rivet City');
+  createBuilding(tiles, 10, 40, 8, 6, 'market', 'Trading Post');
+  createBuilding(tiles, 45, 15, 6, 4, 'clinic', 'Medical Center');
+  
+  const connections: MapConnection[] = [
+    {
+      direction: 'west',
+      targetMapId: 'capital_wasteland',
+      fromPosition: { x: 0, y: 30 * 32 },
+      toPosition: { x: 59 * 32, y: 30 * 32 }
+    },
+    {
+      direction: 'east',
+      targetMapId: 'citadel',
+      fromPosition: { x: 59 * 32, y: 30 * 32 },
+      toPosition: { x: 0, y: 30 * 32 }
+    }
+  ];
+  
+  return {
+    id: 'eastern_districts',
+    width,
+    height,
+    tiles,
+    name: 'Eastern Districts',
+    bgMusic: 'city_ambient',
+    npcs: npcs.filter(npc => npc.mapId === 'eastern_districts'),
+    enemies: enemies.filter(enemy => enemy.mapId === 'eastern_districts'),
+    lootables: createLootables(width, height, 0.025),
+    connections
+  };
+};
+
+// WESTERN OUTSKIRTS - Wilderness
+export const createWesternOutskirts = (): GameMap => {
+  const width = 60;
+  const height = 60;
+  const tiles: Tile[][] = [];
+  
+  for (let y = 0; y < height; y++) {
+    const row: Tile[] = [];
+    for (let x = 0; x < width; x++) {
+      const random = Math.random();
+      let type = 'grass';
+      let walkable = true;
+      
+      if (random < 0.4) type = 'dirt';
+      else if (random < 0.5) type = 'stone';
+      else if (random < 0.55) { type = 'water'; walkable = false; }
+      else if (random < 0.6) type = 'ruins';
+      
+      row.push(createTile(x, y, type, walkable));
+    }
+    tiles.push(row);
+  }
+  
+  // Wilderness outposts
+  createBuilding(tiles, 15, 25, 6, 4, 'ranger_station', 'Ranger Outpost');
+  createBuilding(tiles, 40, 35, 5, 3, 'cabin', 'Survivor\'s Cabin');
+  createBuilding(tiles, 25, 50, 4, 3, 'bunker', 'Hidden Bunker');
+  
+  const connections: MapConnection[] = [
+    {
+      direction: 'east',
+      targetMapId: 'capital_wasteland',
+      fromPosition: { x: 59 * 32, y: 30 * 32 },
+      toPosition: { x: 0, y: 30 * 32 }
+    },
+    {
+      direction: 'west',
+      targetMapId: 'metro_tunnels',
+      fromPosition: { x: 0, y: 30 * 32 },
+      toPosition: { x: 59 * 32, y: 30 * 32 }
+    }
+  ];
+  
+  return {
+    id: 'western_outskirts',
+    width,
+    height,
+    tiles,
+    name: 'Western Outskirts',
+    bgMusic: 'wilderness_ambient',
+    npcs: npcs.filter(npc => npc.mapId === 'western_outskirts'),
+    enemies: enemies.filter(enemy => enemy.mapId === 'western_outskirts'),
+    lootables: createLootables(width, height, 0.02),
+    connections
+  };
+};
+
+// THE PITT - Industrial wasteland (smaller)
 export const createThePitt = (): GameMap => {
-  const width = 100;
-  const height = 80;
+  const width = 50;
+  const height = 40;
   const tiles: Tile[][] = [];
   
   for (let y = 0; y < height; y++) {
@@ -145,13 +399,20 @@ export const createThePitt = (): GameMap => {
   }
   
   // Industrial buildings
-  createBuilding(tiles, 20, 20, 12, 8, 'steel_mill', 'The Mill');
-  createBuilding(tiles, 50, 30, 8, 6, 'slave_quarters', 'Worker Barracks');
-  createBuilding(tiles, 70, 15, 6, 4, 'haven', 'Haven');
-  createBuilding(tiles, 30, 60, 10, 6, 'foundry', 'Steel Foundry');
-  createBuilding(tiles, 80, 50, 5, 4, 'uptown', 'Uptown');
+  createBuilding(tiles, 15, 15, 8, 6, 'steel_mill', 'The Mill');
+  createBuilding(tiles, 30, 20, 6, 4, 'slave_quarters', 'Worker Barracks');
+  
+  const connections: MapConnection[] = [
+    {
+      direction: 'south',
+      targetMapId: 'northern_wasteland',
+      fromPosition: { x: 25 * 32, y: 39 * 32 },
+      toPosition: { x: 30 * 32, y: 0 }
+    }
+  ];
   
   return {
+    id: 'the_pitt',
     width,
     height,
     tiles,
@@ -159,14 +420,15 @@ export const createThePitt = (): GameMap => {
     bgMusic: 'industrial_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'the_pitt'),
     enemies: enemies.filter(enemy => enemy.mapId === 'the_pitt'),
-    lootables: createLootables(width, height, 0.03)
+    lootables: createLootables(width, height, 0.03),
+    connections
   };
 };
 
-// POINT LOOKOUT - Swampland
+// POINT LOOKOUT - Swampland (smaller)
 export const createPointLookout = (): GameMap => {
-  const width = 90;
-  const height = 90;
+  const width = 45;
+  const height = 45;
   const tiles: Tile[][] = [];
   
   for (let y = 0; y < height; y++) {
@@ -189,11 +451,19 @@ export const createPointLookout = (): GameMap => {
   
   // Swamp settlements
   createBuilding(tiles, 15, 15, 6, 4, 'mansion', 'Calvert Mansion');
-  createBuilding(tiles, 40, 30, 5, 3, 'tribal_village', 'Tribal Huts');
-  createBuilding(tiles, 60, 50, 4, 3, 'lighthouse', 'Point Lookout Lighthouse');
-  createBuilding(tiles, 25, 70, 8, 5, 'boardwalk', 'Pier');
+  createBuilding(tiles, 30, 25, 4, 3, 'lighthouse', 'Point Lookout Lighthouse');
+  
+  const connections: MapConnection[] = [
+    {
+      direction: 'north',
+      targetMapId: 'southern_ruins',
+      fromPosition: { x: 22 * 32, y: 0 },
+      toPosition: { x: 30 * 32, y: 59 * 32 }
+    }
+  ];
   
   return {
+    id: 'point_lookout',
     width,
     height,
     tiles,
@@ -201,47 +471,15 @@ export const createPointLookout = (): GameMap => {
     bgMusic: 'swamp_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'point_lookout'),
     enemies: enemies.filter(enemy => enemy.mapId === 'point_lookout'),
-    lootables: createLootables(width, height, 0.025)
+    lootables: createLootables(width, height, 0.025),
+    connections
   };
 };
 
-// MOTHERSHIP ZETA - Alien ship
-export const createMothershipZeta = (): GameMap => {
-  const width = 60;
-  const height = 40;
-  const tiles: Tile[][] = [];
-  
-  for (let y = 0; y < height; y++) {
-    const row: Tile[] = [];
-    for (let x = 0; x < width; x++) {
-      const type = 'building'; // All alien ship interior
-      row.push(createTile(x, y, type, true));
-    }
-    tiles.push(row);
-  }
-  
-  // Alien ship sections
-  createBuilding(tiles, 10, 10, 8, 6, 'cryo_lab', 'Cryogenic Laboratory');
-  createBuilding(tiles, 30, 15, 6, 4, 'bridge', 'Ship Bridge');
-  createBuilding(tiles, 45, 20, 5, 3, 'engine_room', 'Engine Core');
-  createBuilding(tiles, 20, 30, 7, 5, 'experimentation', 'Experimentation Lab');
-  
-  return {
-    width,
-    height,
-    tiles,
-    name: 'Mothership Zeta',
-    bgMusic: 'alien_ambient',
-    npcs: npcs.filter(npc => npc.mapId === 'mothership_zeta'),
-    enemies: enemies.filter(enemy => enemy.mapId === 'mothership_zeta'),
-    lootables: createLootables(width, height, 0.04)
-  };
-};
-
-// BROKEN STEEL CITADEL - Brotherhood stronghold
+// CITADEL - Brotherhood stronghold (smaller)
 export const createCitadel = (): GameMap => {
-  const width = 80;
-  const height = 80;
+  const width = 40;
+  const height = 40;
   const tiles: Tile[][] = [];
   
   for (let y = 0; y < height; y++) {
@@ -259,13 +497,20 @@ export const createCitadel = (): GameMap => {
   }
   
   // Brotherhood facilities
-  createBuilding(tiles, 30, 30, 20, 15, 'citadel', 'The Citadel');
-  createBuilding(tiles, 10, 10, 8, 6, 'armory', 'Brotherhood Armory');
-  createBuilding(tiles, 60, 20, 6, 4, 'laboratory', 'Research Lab');
-  createBuilding(tiles, 15, 60, 10, 8, 'barracks', 'Knight Barracks');
-  createBuilding(tiles, 55, 55, 7, 5, 'workshop', 'Tech Workshop');
+  createBuilding(tiles, 15, 15, 10, 8, 'citadel', 'The Citadel');
+  createBuilding(tiles, 5, 5, 6, 4, 'armory', 'Brotherhood Armory');
+  
+  const connections: MapConnection[] = [
+    {
+      direction: 'west',
+      targetMapId: 'eastern_districts',
+      fromPosition: { x: 0, y: 20 * 32 },
+      toPosition: { x: 59 * 32, y: 30 * 32 }
+    }
+  ];
   
   return {
+    id: 'citadel',
     width,
     height,
     tiles,
@@ -273,14 +518,15 @@ export const createCitadel = (): GameMap => {
     bgMusic: 'brotherhood_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'citadel'),
     enemies: enemies.filter(enemy => enemy.mapId === 'citadel'),
-    lootables: createLootables(width, height, 0.015)
+    lootables: createLootables(width, height, 0.015),
+    connections
   };
 };
 
-// UNDERGROUND METRO - Tunnel system
+// METRO TUNNELS - Underground system (smaller)
 export const createMetroTunnels = (): GameMap => {
-  const width = 150;
-  const height = 50;
+  const width = 80;
+  const height = 25;
   const tiles: Tile[][] = [];
   
   for (let y = 0; y < height; y++) {
@@ -299,12 +545,21 @@ export const createMetroTunnels = (): GameMap => {
   }
   
   // Metro stations
-  createBuilding(tiles, 20, 20, 8, 6, 'metro_station', 'Dupont Circle Station');
-  createBuilding(tiles, 60, 15, 8, 6, 'metro_station', 'Gallery Place Station');
-  createBuilding(tiles, 100, 25, 8, 6, 'metro_station', 'Union Station');
-  createBuilding(tiles, 130, 20, 6, 4, 'metro_station', 'Capitol South');
+  createBuilding(tiles, 15, 10, 6, 4, 'metro_station', 'Dupont Circle Station');
+  createBuilding(tiles, 40, 8, 6, 4, 'metro_station', 'Gallery Place Station');
+  createBuilding(tiles, 65, 12, 6, 4, 'metro_station', 'Union Station');
+  
+  const connections: MapConnection[] = [
+    {
+      direction: 'east',
+      targetMapId: 'western_outskirts',
+      fromPosition: { x: 79 * 32, y: 12 * 32 },
+      toPosition: { x: 0, y: 30 * 32 }
+    }
+  ];
   
   return {
+    id: 'metro_tunnels',
     width,
     height,
     tiles,
@@ -312,15 +567,29 @@ export const createMetroTunnels = (): GameMap => {
     bgMusic: 'underground_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'metro_tunnels'),
     enemies: enemies.filter(enemy => enemy.mapId === 'metro_tunnels'),
-    lootables: createLootables(width, height, 0.035)
+    lootables: createLootables(width, height, 0.035),
+    connections
   };
 };
 
 export const maps = {
   capital_wasteland: createCapitalWasteland,
+  northern_wasteland: createNorthernWasteland,
+  southern_ruins: createSouthernRuins,
+  eastern_districts: createEasternDistricts,
+  western_outskirts: createWesternOutskirts,
   the_pitt: createThePitt,
   point_lookout: createPointLookout,
-  mothership_zeta: createMothershipZeta,
   citadel: createCitadel,
   metro_tunnels: createMetroTunnels
+};
+
+export const createAllMaps = (): { [key: string]: GameMap } => {
+  const allMaps: { [key: string]: GameMap } = {};
+  
+  Object.entries(maps).forEach(([key, createMapFn]) => {
+    allMaps[key] = createMapFn();
+  });
+  
+  return allMaps;
 };

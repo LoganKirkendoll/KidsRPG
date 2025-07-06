@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { GameState, Character, GameSettings, Item, DialogueChoice, Quest } from '../types/game';
-import { createStartingCharacter, createStartingMap, achievements, items } from '../data/gameData';
+import { createStartingCharacter, achievements, items } from '../data/gameData';
+import { createAllMaps } from '../data/maps';
 import { allQuests } from '../data/quests';
 import { SaveSystem } from '../engine/SaveSystem';
 
@@ -28,7 +29,8 @@ export const useGameState = () => {
 
   const createNewGame = useCallback((playerName: string, characterClass: any) => {
     const player = createStartingCharacter(playerName, characterClass);
-    const map = createStartingMap();
+    const allMaps = createAllMaps();
+    const startingMap = allMaps['capital_wasteland'];
     
     // Add starting items to inventory
     const startingInventory: Item[] = [
@@ -44,7 +46,8 @@ export const useGameState = () => {
       allCharacters: [player],
       inventory: startingInventory,
       gold: 100,
-      currentMap: map,
+      currentMap: startingMap,
+      availableMaps: allMaps,
       mapPosition: { x: 25, y: 25 },
       camera: { x: 0, y: 0 },
       gameTime: 0,

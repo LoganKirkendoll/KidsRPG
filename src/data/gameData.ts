@@ -272,8 +272,9 @@ export const createStartingCharacter = (name: string, characterClass: keyof type
 };
 
 export const createStartingMap = (): GameMap => {
-  // Use the new map creation system
-  return maps.capital_wasteland();
+  // This function is deprecated - use createAllMaps from maps.ts instead
+  const { createCapitalWasteland } = require('./maps');
+  return createCapitalWasteland();
 };
 
 export const achievements: Achievement[] = [

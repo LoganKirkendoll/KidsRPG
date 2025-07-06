@@ -6,6 +6,7 @@ export const npcs: NPC[] = [
     id: 'trader_joe',
     name: 'Trader Joe',
     type: 'trader',
+    mapId: 'capital_wasteland',
     position: { x: 15 * 32 + 16, y: 20 * 32 + 16 },
     sprite: 'trader',
     dialogue: [
@@ -45,6 +46,7 @@ export const npcs: NPC[] = [
     id: 'quest_giver',
     name: 'Captain Sarah',
     type: 'quest_giver',
+    mapId: 'capital_wasteland',
     position: { x: 30 * 32 + 16, y: 40 * 32 + 16 },
     sprite: 'captain',
     dialogue: [
@@ -108,6 +110,7 @@ export const npcs: NPC[] = [
     id: 'wanderer',
     name: 'Old Pete',
     type: 'neutral',
+    mapId: 'capital_wasteland',
     position: { x: 10 * 32 + 16, y: 60 * 32 + 16 },
     sprite: 'wanderer',
     dialogue: [
@@ -148,6 +151,7 @@ export const npcs: NPC[] = [
     id: 'doctor_smith',
     name: 'Dr. Smith',
     type: 'trader',
+    mapId: 'eastern_districts',
     position: { x: 70 * 32 + 16, y: 30 * 32 + 16 },
     sprite: 'doctor',
     dialogue: [
@@ -222,6 +226,7 @@ export const npcs: NPC[] = [
     id: 'mechanic_bob',
     name: 'Mechanic Bob',
     type: 'trader',
+    mapId: 'northern_wasteland',
     position: { x: 50 * 32 + 16, y: 80 * 32 + 16 },
     sprite: 'mechanic',
     dialogue: [
@@ -305,6 +310,7 @@ export const npcs: NPC[] = [
     id: 'vault_overseer',
     name: 'Overseer Martinez',
     type: 'quest_giver',
+    mapId: 'capital_wasteland',
     position: { x: 85 * 32 + 16, y: 15 * 32 + 16 },
     sprite: 'overseer',
     dialogue: [
