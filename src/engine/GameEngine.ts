@@ -1,615 +1,1161 @@
-import { GameState, Character, Position, Tile, Enemy, NPC } from '../types/game';
+import { GameState, Character, Enemy, CombatState, Skill, Position, Tile, Item } from '../types/game';
+import { enemyTypes, items } from '../data/gameData';
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private gameState: GameState;
-  private keys: Set<string> = new Set();
-  private lastUpdateTime = 0;
+  private keys: { [key: string]: boolean } = {};
+  private lastTime = 0;
   private animationId: number | null = null;
-  private stateChangeCallback?: (newState: GameState) => void;
+  private stateChangeCallback?: (state: GameState) => void;
   private lootableCallback?: (lootable: any) => void;
+  private isInputActive = false;
 
-  constructor(canvas: HTMLCanvasElement, initialGameState: GameState) {
+  constructor(canvas: HTMLCanvasElement, initialState: GameState) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
-    this.gameState = JSON.parse(JSON.stringify(initialGameState));
+    this.gameState = { ...initialState };
     
     // Set canvas size
     this.canvas.width = 800;
     this.canvas.height = 600;
     
     this.setupEventListeners();
-    this.initializeVisibilityMap();
-    this.gameLoop();
+    this.startGameLoop();
+  }
+
+  setStateChangeCallback(callback: (state: GameState) => void) {
+    this.stateChangeCallback = callback;
+  }
+
+  setLootableCallback(callback: (lootable: any) => void) {
+    this.lootableCallback = callback;
+  }
+
+  setGameState(newState: GameState) {
+    this.gameState = { ...newState };
+  }
+
+  getGameState(): GameState {
+    return { ...this.gameState };
   }
 
   private setupEventListeners() {
     // Keyboard events
     window.addEventListener('keydown', (e) => {
-      this.keys.add(e.key.toLowerCase());
+      // Don't handle hotkeys if input is active or in certain game modes
+      if (this.shouldIgnoreHotkeys()) {
+        return;
+      }
+      
+      this.keys[e.key.toLowerCase()] = true;
       this.handleKeyPress(e.key.toLowerCase());
     });
 
     window.addEventListener('keyup', (e) => {
-      this.keys.delete(e.key.toLowerCase());
+      if (this.shouldIgnoreHotkeys()) {
+        return;
+      }
+      
+      this.keys[e.key.toLowerCase()] = false;
     });
 
-    // Prevent default behavior for game keys
-    window.addEventListener('keydown', (e) => {
-      const gameKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'f', 'i', 'e', 'c', 'q', 'm'];
-      if (gameKeys.includes(e.key.toLowerCase())) {
-        e.preventDefault();
+    // Canvas click events
+    this.canvas.addEventListener('click', (e) => {
+      this.handleCanvasClick(e);
+    });
+    
+    // Listen for input focus/blur events
+    document.addEventListener('focusin', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true') {
+        this.isInputActive = true;
+      }
+    });
+    
+    document.addEventListener('focusout', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true') {
+        this.isInputActive = false;
       }
     });
   }
+  
+  private shouldIgnoreHotkeys(): boolean {
+    // Ignore hotkeys if:
+    // 1. An input field is focused
+    // 2. In certain game modes where hotkeys shouldn't work
+    // 3. Dev mode is open and enabled
+    
+    if (this.isInputActive) {
+      return true;
+    }
+    
+    const gameMode = this.gameState.gameMode;
+    const ignoredModes = ['inventory', 'equipment', 'character', 'quests', 'map', 'dialogue', 'combat'];
+    
+    if (ignoredModes.includes(gameMode)) {
+      return true;
+    }
+    
+    // Check if dev mode is open
+    if (this.gameState.devMode?.enabled) {
+      return true;
+    }
+    
+    return false;
+  }
 
   private handleKeyPress(key: string) {
-    if (!this.gameState || this.gameState.gameMode !== 'exploration') return;
+    // Additional check for specific keys that should always work
+    const alwaysAllowedKeys = ['escape', 'f1'];
+    
+    if (!alwaysAllowedKeys.includes(key) && this.shouldIgnoreHotkeys()) {
+      return;
+    }
 
     switch (key) {
-      case ' ':
-      case 'f':
-        this.handleInteraction();
-        break;
-      case 'i':
-        this.openInventory();
-        break;
-      case 'e':
-        this.openEquipment();
-        break;
-      case 'c':
-        this.openCharacterScreen();
-        break;
-      case 'q':
-        this.openQuestScreen();
-        break;
-      case 'm':
-        this.openMapScreen();
+      case 'escape':
+        this.handleEscapeKey();
         break;
       case 'f1':
         this.toggleDevMode();
         break;
-      case 'escape':
-        this.openMainMenu();
+      case 'i':
+        this.gameState.gameMode = 'inventory';
+        this.notifyStateChange();
+        break;
+      case 'e':
+        this.gameState.gameMode = 'equipment';
+        this.notifyStateChange();
+        break;
+      case 'c':
+        this.gameState.gameMode = 'character';
+        this.notifyStateChange();
+        break;
+      case 'q':
+        this.gameState.gameMode = 'quests';
+        this.notifyStateChange();
+        break;
+      case 'm':
+        this.gameState.gameMode = 'map';
+        this.notifyStateChange();
+        break;
+      case ' ':
+      case 'f':
+        this.handleInteraction();
         break;
     }
   }
-
-  private gameLoop = (currentTime: number = 0) => {
-    const deltaTime = currentTime - this.lastUpdateTime;
-    this.lastUpdateTime = currentTime;
-
-    this.update(deltaTime);
-    this.render();
-
-    this.animationId = requestAnimationFrame(this.gameLoop);
-  };
-
-  private update(deltaTime: number) {
-    if (!this.gameState || this.gameState.gameMode !== 'exploration') return;
-
-    // Update game time
-    this.gameState.gameTime += deltaTime / 1000;
-    this.gameState.dayNightCycle = (this.gameState.gameTime / 300) % 1; // 5 minute day cycle
-
-    // Handle player movement
-    this.updatePlayerMovement(deltaTime);
-
-    // Update NPCs and enemies
-    this.updateNPCs(deltaTime);
-    this.updateEnemies(deltaTime);
-
-    // Update visibility
-    this.updateVisibility();
-
-    // Update skill cooldowns
-    this.updateSkillCooldowns(deltaTime);
-
-    // Update statistics
-    this.gameState.statistics.playtime += deltaTime / 1000;
-  }
-
-  private updatePlayerMovement(deltaTime: number) {
-    if (!this.gameState.player || this.gameState.player.isMoving) return;
-
-    const moveSpeed = 128; // pixels per second
-    const tileSize = 32;
-    let newX = this.gameState.player.position.x;
-    let newY = this.gameState.player.position.y;
-    let moved = false;
-
-    // Check movement keys
-    if (this.keys.has('w') || this.keys.has('arrowup')) {
-      newY -= moveSpeed * (deltaTime / 1000);
-      this.gameState.player.direction = 'up';
-      moved = true;
-    }
-    if (this.keys.has('s') || this.keys.has('arrowdown')) {
-      newY += moveSpeed * (deltaTime / 1000);
-      this.gameState.player.direction = 'down';
-      moved = true;
-    }
-    if (this.keys.has('a') || this.keys.has('arrowleft')) {
-      newX -= moveSpeed * (deltaTime / 1000);
-      this.gameState.player.direction = 'left';
-      moved = true;
-    }
-    if (this.keys.has('d') || this.keys.has('arrowright')) {
-      newX += moveSpeed * (deltaTime / 1000);
-      this.gameState.player.direction = 'right';
-      moved = true;
-    }
-
-    if (moved) {
-      // Check if the new position is valid
-      const tileX = Math.floor(newX / tileSize);
-      const tileY = Math.floor(newY / tileSize);
-
-      if (this.isValidPosition(tileX, tileY)) {
-        this.gameState.player.position.x = newX;
-        this.gameState.player.position.y = newY;
-        this.gameState.player.isMoving = true;
-
-        // Update camera to follow player
-        this.updateCamera();
-
-        // Update statistics
-        const distance = Math.sqrt(
-          Math.pow(newX - this.gameState.player.position.x, 2) +
-          Math.pow(newY - this.gameState.player.position.y, 2)
-        );
-        this.gameState.statistics.distanceTraveled += distance;
-
-        // Mark tile as discovered
-        this.discoverTile(tileX, tileY);
-      }
-
-      // Reset moving state after a short delay
-      setTimeout(() => {
-        if (this.gameState.player) {
-          this.gameState.player.isMoving = false;
-        }
-      }, 100);
+  
+  private handleEscapeKey() {
+    // Handle escape key based on current context
+    if (this.gameState.devMode?.enabled) {
+      this.gameState.devMode.enabled = false;
+      this.notifyStateChange();
+    } else if (this.gameState.gameMode !== 'exploration') {
+      // Return to exploration mode from any menu
+      this.gameState.gameMode = 'exploration';
+      this.notifyStateChange();
     }
   }
 
-  private isValidPosition(tileX: number, tileY: number): boolean {
-    if (!this.gameState.currentMap) return false;
-
-    const map = this.gameState.currentMap;
+  private handleCanvasClick(e: MouseEvent) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     
-    // Check bounds
-    if (tileX < 0 || tileX >= map.width || tileY < 0 || tileY >= map.height) {
-      return false;
+    // Convert screen coordinates to world coordinates
+    const worldX = x + this.gameState.camera.x;
+    const worldY = y + this.gameState.camera.y;
+    
+    // Check for interactions
+    this.checkInteractionAt(worldX, worldY);
+  }
+
+  private checkInteractionAt(x: number, y: number) {
+    // Check for building entrances
+    const tileX = Math.floor(x / 32);
+    const tileY = Math.floor(y / 32);
+    const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
+    
+    if (tile?.isEntrance && (tile.buildingType || tile.regionType)) {
+      if (tile.buildingType) {
+        this.enterBuilding(tile.buildingType, tile.buildingName);
+      } else if (tile.regionType) {
+        this.enterRegion(tile.regionType, tile.regionName);
+      }
+      return;
     }
 
-    // Check if tile is walkable
-    const tile = map.tiles[tileY][tileX];
-    return tile.walkable;
-  }
+    // Check for NPCs
+    for (const npc of this.gameState.currentMap.npcs) {
+      const distance = Math.sqrt(
+        Math.pow(x - npc.position.x, 2) + Math.pow(y - npc.position.y, 2)
+      );
+      
+      if (distance < 32) {
+        this.startDialogue(npc.id);
+        return;
+      }
+    }
 
-  private updateCamera() {
-    if (!this.gameState.player) return;
+    // Check for enemies
+    for (const enemy of this.gameState.currentMap.enemies) {
+      const distance = Math.sqrt(
+        Math.pow(x - enemy.position.x, 2) + Math.pow(y - enemy.position.y, 2)
+      );
+      
+      if (distance < 32) {
+        this.startCombat([enemy]);
+        return;
+      }
+    }
 
-    const centerX = this.canvas.width / 2;
-    const centerY = this.canvas.height / 2;
-
-    this.gameState.camera.x = this.gameState.player.position.x - centerX;
-    this.gameState.camera.y = this.gameState.player.position.y - centerY;
-
-    // Clamp camera to map bounds
-    const mapPixelWidth = this.gameState.currentMap.width * 32;
-    const mapPixelHeight = this.gameState.currentMap.height * 32;
-
-    this.gameState.camera.x = Math.max(0, Math.min(this.gameState.camera.x, mapPixelWidth - this.canvas.width));
-    this.gameState.camera.y = Math.max(0, Math.min(this.gameState.camera.y, mapPixelHeight - this.canvas.height));
-  }
-
-  private updateNPCs(deltaTime: number) {
-    // NPCs are mostly stationary in this implementation
-    // Could add patrol behavior here
-  }
-
-  private updateEnemies(deltaTime: number) {
-    if (!this.gameState.currentMap.enemies) return;
-
-    this.gameState.currentMap.enemies.forEach(enemy => {
-      if (enemy.ai.type === 'patrol') {
-        // Simple patrol movement
-        const moveSpeed = enemy.ai.speed;
-        const direction = Math.random() < 0.5 ? 1 : -1;
-        
-        if (Math.random() < 0.01) { // 1% chance to change direction each frame
-          enemy.position.x += direction * moveSpeed * (deltaTime / 1000);
-          enemy.position.y += direction * moveSpeed * (deltaTime / 1000);
+    // Check for lootables
+    for (const lootable of this.gameState.currentMap.lootables) {
+      const distance = Math.sqrt(
+        Math.pow(x - lootable.position.x, 2) + Math.pow(y - lootable.position.y, 2)
+      );
+      
+      if (distance < 32 && !lootable.looted) {
+        if (this.lootableCallback) {
+          this.lootableCallback(lootable);
         }
-      }
-    });
-  }
-
-  private updateVisibility() {
-    if (!this.gameState.player || !this.gameState.currentMap) return;
-
-    const playerTileX = Math.floor(this.gameState.player.position.x / 32);
-    const playerTileY = Math.floor(this.gameState.player.position.y / 32);
-    const visionRange = 8;
-
-    // Clear current visibility
-    for (let y = 0; y < this.gameState.currentMap.height; y++) {
-      for (let x = 0; x < this.gameState.currentMap.width; x++) {
-        this.gameState.currentMap.tiles[y][x].visible = false;
+        return;
       }
     }
+  }
 
-    // Set visibility around player
-    for (let y = playerTileY - visionRange; y <= playerTileY + visionRange; y++) {
-      for (let x = playerTileX - visionRange; x <= playerTileX + visionRange; x++) {
-        if (x >= 0 && x < this.gameState.currentMap.width && 
-            y >= 0 && y < this.gameState.currentMap.height) {
-          const distance = Math.sqrt((x - playerTileX) ** 2 + (y - playerTileY) ** 2);
-          if (distance <= visionRange) {
-            this.gameState.currentMap.tiles[y][x].visible = true;
-            this.discoverTile(x, y);
+  private enterBuilding(buildingType: string, buildingName?: string) {
+    // Create a simple interior map for buildings
+    const interiorMap = this.createInteriorMap(buildingType);
+    
+    // Store the current map position
+    this.gameState.previousMap = {
+      map: this.gameState.currentMap,
+      position: { ...this.gameState.player.position }
+    };
+    
+    // Switch to interior
+    this.gameState.currentMap = interiorMap;
+    
+    // Find a safe spawn position
+    const spawnPosition = this.findSafeSpawnPosition(interiorMap);
+    this.gameState.player.position = spawnPosition;
+    
+    this.updateCamera();
+    this.updateVisibility();
+    this.notifyStateChange();
+  }
+
+  private enterRegion(regionType: string, regionName?: string) {
+    // Create a new region map
+    const regionMap = this.createRegionMap(regionType);
+    
+    // Store the current map position
+    this.gameState.previousMap = {
+      map: this.gameState.currentMap,
+      position: { ...this.gameState.player.position }
+    };
+    
+    // Switch to region
+    this.gameState.currentMap = regionMap;
+    
+    // Find a safe spawn position
+    const spawnPosition = this.findSafeSpawnPosition(regionMap);
+    this.gameState.player.position = spawnPosition;
+    
+    this.updateCamera();
+    this.updateVisibility();
+    this.notifyStateChange();
+  }
+
+  private findSafeSpawnPosition(map: any): Position {
+    // Start from the bottom center and work our way up to find a safe spot
+    const centerX = Math.floor(map.width / 2);
+    const startY = map.height - 3; // Start a bit up from the bottom
+    
+    // Check positions in expanding circles from the center bottom
+    for (let radius = 0; radius < 10; radius++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const checkX = centerX + dx;
+          const checkY = startY + dy;
+          
+          // Make sure we're within bounds
+          if (checkX >= 0 && checkX < map.width && checkY >= 0 && checkY < map.height) {
+            const tile = map.tiles[checkY][checkX];
+            
+            // Check if this position is walkable and safe
+            if (tile.walkable && this.isPositionSafe(map, checkX, checkY)) {
+              return {
+                x: checkX * 32 + 16, // Center of tile
+                y: checkY * 32 + 16
+              };
+            }
           }
         }
       }
     }
-
-    // Update visibility map for UI
-    this.updateVisibilityMap();
+    
+    // Fallback to a basic safe position if nothing found
+    return { x: centerX * 32 + 16, y: (startY + 1) * 32 + 16 };
   }
 
-  private discoverTile(x: number, y: number) {
-    if (x >= 0 && x < this.gameState.currentMap.width && 
-        y >= 0 && y < this.gameState.currentMap.height) {
-      this.gameState.currentMap.tiles[y][x].discovered = true;
-    }
-  }
-
-  private updateVisibilityMap() {
-    if (!this.gameState.currentMap) return;
-
-    this.gameState.visibilityMap = [];
-    for (let y = 0; y < this.gameState.currentMap.height; y++) {
-      const row: boolean[] = [];
-      for (let x = 0; x < this.gameState.currentMap.width; x++) {
-        row.push(this.gameState.currentMap.tiles[y][x].visible);
-      }
-      this.gameState.visibilityMap.push(row);
-    }
-  }
-
-  private updateSkillCooldowns(deltaTime: number) {
-    if (!this.gameState.player) return;
-
-    this.gameState.player.skills.forEach(skill => {
-      if (skill.currentCooldown > 0) {
-        skill.currentCooldown = Math.max(0, skill.currentCooldown - deltaTime / 1000);
-      }
-    });
-  }
-
-  private initializeVisibilityMap() {
-    if (!this.gameState.currentMap) return;
-
-    this.gameState.visibilityMap = [];
-    for (let y = 0; y < this.gameState.currentMap.height; y++) {
-      const row: boolean[] = [];
-      for (let x = 0; x < this.gameState.currentMap.width; x++) {
-        row.push(false);
-      }
-      this.gameState.visibilityMap.push(row);
-    }
-  }
-
-  private render() {
-    if (!this.gameState || !this.gameState.currentMap) return;
-
-    // Clear canvas
-    this.ctx.fillStyle = '#000000';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    // Render map
-    this.renderMap();
-
-    // Render entities
-    this.renderNPCs();
-    this.renderEnemies();
-    this.renderPlayer();
-
-    // Render UI
-    this.renderUI();
-  }
-
-  private renderMap() {
-    const map = this.gameState.currentMap;
-    const tileSize = 32;
-    const camera = this.gameState.camera;
-
-    const startX = Math.floor(camera.x / tileSize);
-    const startY = Math.floor(camera.y / tileSize);
-    const endX = Math.min(startX + Math.ceil(this.canvas.width / tileSize) + 1, map.width);
-    const endY = Math.min(startY + Math.ceil(this.canvas.height / tileSize) + 1, map.height);
-
-    for (let y = Math.max(0, startY); y < endY; y++) {
-      for (let x = Math.max(0, startX); x < endX; x++) {
-        const tile = map.tiles[y][x];
-        if (!tile.discovered) continue;
-
-        const screenX = x * tileSize - camera.x;
-        const screenY = y * tileSize - camera.y;
-
-        // Get tile color based on type
-        let color = this.getTileColor(tile.type);
+  private isPositionSafe(map: any, tileX: number, tileY: number): boolean {
+    // Check that the position and surrounding area are walkable
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const checkX = tileX + dx;
+        const checkY = tileY + dy;
         
-        // Darken if not visible
-        if (!tile.visible) {
-          color = this.darkenColor(color, 0.5);
-        }
-
-        this.ctx.fillStyle = color;
-        this.ctx.fillRect(screenX, screenY, tileSize, tileSize);
-
-        // Draw tile borders for buildings
-        if (tile.type === 'building') {
-          this.ctx.strokeStyle = '#444444';
-          this.ctx.lineWidth = 1;
-          this.ctx.strokeRect(screenX, screenY, tileSize, tileSize);
+        if (checkX >= 0 && checkX < map.width && checkY >= 0 && checkY < map.height) {
+          const tile = map.tiles[checkY][checkX];
+          if (!tile.walkable) {
+            return false; // Not safe if any surrounding tile is blocked
+          }
         }
       }
     }
-  }
-
-  private getTileColor(type: string): string {
-    switch (type) {
-      case 'grass': return '#4a7c59';
-      case 'dirt': return '#8b4513';
-      case 'stone': return '#696969';
-      case 'water': return '#4682b4';
-      case 'ruins': return '#2f2f2f';
-      case 'building': return '#654321';
-      case 'sand': return '#f4a460';
-      default: return '#333333';
+    
+    // Also check that there are no enemies or NPCs too close
+    const worldX = tileX * 32 + 16;
+    const worldY = tileY * 32 + 16;
+    
+    for (const enemy of map.enemies) {
+      const distance = Math.sqrt(
+        Math.pow(worldX - enemy.position.x, 2) + Math.pow(worldY - enemy.position.y, 2)
+      );
+      if (distance < 64) { // Too close to enemy
+        return false;
+      }
     }
+    
+    return true;
   }
-
-  private darkenColor(color: string, factor: number): string {
-    const hex = color.replace('#', '');
-    const r = Math.floor(parseInt(hex.substr(0, 2), 16) * factor);
-    const g = Math.floor(parseInt(hex.substr(2, 2), 16) * factor);
-    const b = Math.floor(parseInt(hex.substr(4, 2), 16) * factor);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-
-  private renderPlayer() {
-    if (!this.gameState.player) return;
-
-    const camera = this.gameState.camera;
-    const screenX = this.gameState.player.position.x - camera.x;
-    const screenY = this.gameState.player.position.y - camera.y;
-
-    // Draw player as a colored circle
-    this.ctx.fillStyle = '#ff4444';
-    this.ctx.beginPath();
-    this.ctx.arc(screenX, screenY, 12, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    // Draw direction indicator
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.beginPath();
-    let dirX = 0, dirY = 0;
-    switch (this.gameState.player.direction) {
-      case 'up': dirY = -8; break;
-      case 'down': dirY = 8; break;
-      case 'left': dirX = -8; break;
-      case 'right': dirX = 8; break;
+  private createInteriorMap(buildingType: string): any {
+    const width = 15;
+    const height = 10;
+    const tiles = [];
+    
+    // Create interior tiles
+    for (let y = 0; y < height; y++) {
+      const row = [];
+      for (let x = 0; x < width; x++) {
+        let type = 'building';
+        let walkable = true;
+        let isExit = false;
+        
+        // Create walls around the edges
+        if (x === 0 || x === width - 1 || y === 0 || y === height - 1) {
+          walkable = false;
+        }
+        
+        // Create exit area at bottom center (3 tiles wide)
+        if (x >= Math.floor(width / 2) - 1 && x <= Math.floor(width / 2) + 1 && y >= height - 2) {
+          walkable = true;
+          isExit = true;
+          type = 'grass'; // Different visual for exit
+        }
+        
+        // Ensure spawn area is clear (around center, a few tiles up from bottom)
+        if (x >= Math.floor(width / 2) - 2 && x <= Math.floor(width / 2) + 2 && 
+            y >= height - 5 && y <= height - 3) {
+          walkable = true;
+        }
+        
+        row.push({
+          x,
+          y,
+          type,
+          walkable,
+          sprite: type,
+          discovered: true,
+          visible: true,
+          description: isExit ? 'Exit to outside' : 'Interior floor',
+          isExit
+        });
+      }
+      tiles.push(row);
     }
-    this.ctx.arc(screenX + dirX, screenY + dirY, 3, 0, Math.PI * 2);
-    this.ctx.fill();
-  }
-
-  private renderNPCs() {
-    if (!this.gameState.currentMap.npcs) return;
-
-    const camera = this.gameState.camera;
-
-    this.gameState.currentMap.npcs.forEach(npc => {
-      const tileX = Math.floor(npc.position.x / 32);
-      const tileY = Math.floor(npc.position.y / 32);
-      const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
+    
+    // Add interior-specific NPCs and items based on building type
+    const npcs: any[] = [];
+    const lootables: any[] = [];
+    const enemies: any[] = [];
+    
+    if (buildingType === 'clinic') {
+      // Add medical supplies
+      lootables.push({
+        id: 'clinic_supplies',
+        position: { x: 5 * 32, y: 3 * 32 },
+        items: [
+          { ...items.find(i => i.id === 'stimpak')!, quantity: 2 },
+          items.find(i => i.id === 'rad_away')!
+        ],
+        type: 'container',
+        sprite: 'medical_cabinet',
+        discovered: true,
+        looted: false
+      });
+    } else if (buildingType === 'workshop') {
+      // Add crafting materials
+      lootables.push({
+        id: 'workshop_supplies',
+        position: { x: 8 * 32, y: 4 * 32 },
+        items: [
+          { ...items.find(i => i.id === 'scrap_metal')!, quantity: 5 },
+          { ...items.find(i => i.id === 'electronics')!, quantity: 2 }
+        ],
+        type: 'container',
+        sprite: 'toolbox',
+        discovered: true,
+        looted: false
+      });
+    } else if (buildingType === 'tech_facility') {
+      // Add robots and high-tech loot
+      enemies.push({
+        ...enemyTypes.find(e => e.id === 'robot')!,
+        id: 'facility_robot_1',
+        position: { x: 6 * 32, y: 3 * 32 }
+      });
       
-      if (!tile?.visible) return;
-
-      const screenX = npc.position.x - camera.x;
-      const screenY = npc.position.y - camera.y;
-
-      // Draw NPC as a colored circle
-      this.ctx.fillStyle = npc.isHostile ? '#ff8800' : '#44ff44';
-      this.ctx.beginPath();
-      this.ctx.arc(screenX, screenY, 10, 0, Math.PI * 2);
-      this.ctx.fill();
-
-      // Draw name above NPC
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = '12px Arial';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText(npc.name, screenX, screenY - 15);
-    });
+      lootables.push({
+        id: 'tech_loot',
+        position: { x: 10 * 32, y: 2 * 32 },
+        items: [
+          items.find(i => i.id === 'plasma_rifle')!,
+          { ...items.find(i => i.id === 'electronics')!, quantity: 3 }
+        ],
+        type: 'container',
+        sprite: 'tech_cache',
+        discovered: true,
+        looted: false
+      });
+    }
+    
+    return {
+      width,
+      height,
+      tiles,
+      name: `${buildingType} Interior`,
+      bgMusic: 'interior_ambient',
+      npcs,
+      enemies,
+      lootables,
+      isInterior: true
+    };
   }
 
-  private renderEnemies() {
-    if (!this.gameState.currentMap.enemies) return;
-
-    const camera = this.gameState.camera;
-
-    this.gameState.currentMap.enemies.forEach(enemy => {
-      const tileX = Math.floor(enemy.position.x / 32);
-      const tileY = Math.floor(enemy.position.y / 32);
-      const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
+  private createRegionMap(regionType: string): any {
+    let width = 50;
+    let height = 50;
+    let tiles = [];
+    
+    // Create region-specific terrain
+    for (let y = 0; y < height; y++) {
+      const row = [];
+      for (let x = 0; x < width; x++) {
+        let type = 'grass';
+        let walkable = true;
+        let description = 'Unknown terrain';
+        let isExit = false;
+        
+        // Create walls around the edges for caves and tunnels
+        if ((regionType === 'cave' || regionType === 'tunnel') && 
+            (x === 0 || x === width - 1 || y === 0 || y === height - 1)) {
+          type = 'stone';
+          walkable = false;
+          description = 'Rock wall';
+        } else {
+          // Set terrain based on region type
+          const random = Math.random();
+          switch (regionType) {
+            case 'cave':
+              type = random < 0.1 ? 'water' : random < 0.3 ? 'stone' : 'dirt';
+              description = type === 'water' ? 'Underground pool' : 
+                           type === 'stone' ? 'Cave wall' : 'Cave floor';
+              if (type === 'stone') walkable = false;
+              break;
+            case 'tunnel':
+              type = random < 0.05 ? 'stone' : 'dirt';
+              description = type === 'stone' ? 'Tunnel wall' : 'Tunnel floor';
+              if (type === 'stone') walkable = false;
+              break;
+            case 'forest':
+              type = random < 0.2 ? 'ruins' : random < 0.1 ? 'water' : 'grass';
+              description = type === 'ruins' ? 'Overgrown ruins' : 
+                           type === 'water' ? 'Forest stream' : 'Forest floor';
+              if (type === 'water') walkable = false;
+              break;
+            case 'desert':
+              type = random < 0.1 ? 'stone' : random < 0.05 ? 'ruins' : 'sand';
+              description = type === 'stone' ? 'Desert rock' : 
+                           type === 'ruins' ? 'Desert ruins' : 'Desert sand';
+              if (type === 'stone') walkable = false;
+              break;
+            case 'swamp':
+              type = random < 0.4 ? 'water' : random < 0.2 ? 'ruins' : 'grass';
+              description = type === 'water' ? 'Swamp water' : 
+                           type === 'ruins' ? 'Sunken ruins' : 'Swamp ground';
+              if (type === 'water') walkable = false;
+              break;
+          }
+        }
+        
+        // Create exit area at bottom center (wider area)
+        if (x >= Math.floor(width / 2) - 2 && x <= Math.floor(width / 2) + 2 && y >= height - 3) {
+          walkable = true;
+          isExit = true;
+          type = regionType === 'cave' || regionType === 'tunnel' ? 'dirt' : type;
+          description = 'Exit to wasteland';
+        }
+        
+        // Ensure spawn area is clear (around center, a few tiles up from bottom)
+        if (x >= Math.floor(width / 2) - 3 && x <= Math.floor(width / 2) + 3 && 
+            y >= height - 8 && y <= height - 4) {
+          walkable = true;
+          if (regionType === 'cave' || regionType === 'tunnel') {
+            type = 'dirt';
+          } else if (regionType === 'desert') {
+            type = 'sand';
+          } else {
+            type = 'grass';
+          }
+        }
+        
+        row.push({
+          x,
+          y,
+          type,
+          walkable,
+          sprite: type,
+          discovered: true,
+          visible: true,
+          description,
+          isExit
+        });
+      }
+      tiles.push(row);
+    }
+    
+    // Add region-specific content
+    const npcs: any[] = [];
+    const lootables: any[] = [];
+    const enemies: any[] = [];
+    
+    // Add enemies based on region type
+    const enemyCount = Math.floor(Math.random() * 8) + 3;
+    for (let i = 0; i < enemyCount; i++) {
+      // Keep enemies away from spawn area
+      let x, y;
+      let attempts = 0;
+      do {
+        x = Math.floor(Math.random() * (width - 4)) + 2;
+        y = Math.floor(Math.random() * (height - 4)) + 2;
+        attempts++;
+      } while (attempts < 20 && this.isInSpawnArea(x, y, width, height));
       
-      if (!tile?.visible) return;
-
-      const screenX = enemy.position.x - camera.x;
-      const screenY = enemy.position.y - camera.y;
-
-      // Draw enemy as a colored circle
-      this.ctx.fillStyle = '#ff0000';
-      this.ctx.beginPath();
-      this.ctx.arc(screenX, screenY, 8, 0, Math.PI * 2);
-      this.ctx.fill();
-    });
+      if (tiles[y][x].walkable) {
+        let enemyTemplate;
+        switch (regionType) {
+          case 'cave':
+          case 'tunnel':
+            enemyTemplate = enemyTypes[Math.random() < 0.6 ? 1 : 2]; // Mutants or robots
+            break;
+          case 'forest':
+          case 'swamp':
+            enemyTemplate = enemyTypes[Math.random() < 0.7 ? 0 : 1]; // Raiders or mutants
+            break;
+          case 'desert':
+            enemyTemplate = enemyTypes[Math.random() < 0.5 ? 0 : 3]; // Raiders or bosses
+            break;
+          default:
+            enemyTemplate = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+        }
+        
+        enemies.push({
+          ...enemyTemplate,
+          id: `${enemyTemplate.id}_${regionType}_${i}`,
+          position: { x: x * 32 + 16, y: y * 32 + 16 }
+        });
+      }
+    }
+    
+    // Add lootables
+    const lootableCount = Math.floor(Math.random() * 6) + 2;
+    for (let i = 0; i < lootableCount; i++) {
+      // Keep lootables away from spawn area
+      let x, y;
+      let attempts = 0;
+      do {
+        x = Math.floor(Math.random() * (width - 4)) + 2;
+        y = Math.floor(Math.random() * (height - 4)) + 2;
+        attempts++;
+      } while (attempts < 20 && this.isInSpawnArea(x, y, width, height));
+      
+      if (tiles[y][x].walkable) {
+        const lootType = Math.random() < 0.4 ? 'corpse' : 'container';
+        const lootItems = [];
+        const numItems = Math.floor(Math.random() * 3) + 1;
+        
+        for (let j = 0; j < numItems; j++) {
+          const randomItem = items[Math.floor(Math.random() * items.length)];
+          lootItems.push({
+            ...randomItem,
+            quantity: randomItem.stackable ? Math.floor(Math.random() * 3) + 1 : 1
+          });
+        }
+        
+        lootables.push({
+          id: `${regionType}_loot_${i}`,
+          position: { x: x * 32 + 16, y: y * 32 + 16 },
+          items: lootItems,
+          type: lootType,
+          sprite: lootType,
+          discovered: true,
+          looted: false
+        });
+      }
+    }
+    
+    return {
+      width,
+      height,
+      tiles,
+      name: `${regionType.charAt(0).toUpperCase() + regionType.slice(1)} Region`,
+      bgMusic: `${regionType}_ambient`,
+      npcs,
+      enemies,
+      lootables,
+      isInterior: true
+    };
   }
 
-  private renderUI() {
-    // Health bar
-    const healthPercent = this.gameState.player.health / this.gameState.player.maxHealth;
-    this.ctx.fillStyle = '#ff0000';
-    this.ctx.fillRect(10, 10, 200 * healthPercent, 20);
-    this.ctx.strokeStyle = '#ffffff';
-    this.ctx.strokeRect(10, 10, 200, 20);
-
-    // Energy bar
-    const energyPercent = this.gameState.player.energy / this.gameState.player.maxEnergy;
-    this.ctx.fillStyle = '#0066ff';
-    this.ctx.fillRect(10, 35, 200 * energyPercent, 15);
-    this.ctx.strokeStyle = '#ffffff';
-    this.ctx.strokeRect(10, 35, 200, 15);
-
-    // Level and experience
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = '14px Arial';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText(`Level ${this.gameState.player.level}`, 10, 70);
-    this.ctx.fillText(`XP: ${this.gameState.player.experience}/${this.gameState.player.experienceToNext}`, 10, 85);
-
-    // Position info
-    const tileX = Math.floor(this.gameState.player.position.x / 32);
-    const tileY = Math.floor(this.gameState.player.position.y / 32);
-    this.ctx.fillText(`Position: ${tileX}, ${tileY}`, 10, 100);
-
-    // Time of day
-    const timeOfDay = this.gameState.dayNightCycle < 0.25 ? 'Night' :
-                     this.gameState.dayNightCycle < 0.5 ? 'Morning' :
-                     this.gameState.dayNightCycle < 0.75 ? 'Day' : 'Evening';
-    this.ctx.fillText(`Time: ${timeOfDay}`, 10, 115);
+  private isInSpawnArea(x: number, y: number, mapWidth: number, mapHeight: number): boolean {
+    const centerX = Math.floor(mapWidth / 2);
+    const spawnY = mapHeight - 6; // Around where player spawns
+    
+    // Check if position is within spawn safety zone
+    return Math.abs(x - centerX) <= 4 && Math.abs(y - spawnY) <= 3;
   }
-
+  
   private handleInteraction() {
-    if (!this.gameState.player) return;
-
-    const playerTileX = Math.floor(this.gameState.player.position.x / 32);
-    const playerTileY = Math.floor(this.gameState.player.position.y / 32);
-
-    // Check for NPCs in adjacent tiles
-    const npc = this.findNearbyNPC(playerTileX, playerTileY);
-    if (npc) {
-      this.startDialogue(npc);
-      return;
+    const playerPos = this.gameState.player.position;
+    
+    // Check for exit if in interior
+    if (this.gameState.currentMap.isInterior) {
+      // Check a wider area around the player for exits
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const checkX = Math.floor((playerPos.x + dx * 16) / 32);
+          const checkY = Math.floor((playerPos.y + dy * 16) / 32);
+          const tile = this.gameState.currentMap.tiles[checkY]?.[checkX];
+          
+          if (tile?.isExit && this.gameState.previousMap) {
+            // Exit building
+            this.gameState.currentMap = this.gameState.previousMap.map;
+            this.gameState.player.position = this.gameState.previousMap.position;
+            this.gameState.previousMap = undefined;
+            
+            this.updateCamera();
+            this.updateVisibility();
+            this.notifyStateChange();
+            return;
+          }
+        }
+      }
+      
+      // Also check if player is near the bottom edge (common exit location)
+      const tileY = Math.floor(playerPos.y / 32);
+      if (tileY >= this.gameState.currentMap.height - 2 && this.gameState.previousMap) {
+        // Exit building
+        this.gameState.currentMap = this.gameState.previousMap.map;
+        this.gameState.player.position = this.gameState.previousMap.position;
+        this.gameState.previousMap = undefined;
+        
+        this.updateCamera();
+        this.updateVisibility();
+        this.notifyStateChange();
+        return;
+      }
     }
-
-    // Check for enemies in adjacent tiles
-    const enemy = this.findNearbyEnemy(playerTileX, playerTileY);
-    if (enemy) {
-      this.startCombat([enemy]);
-      return;
-    }
-
-    // Check for lootables
-    const lootable = this.findNearbyLootable(playerTileX, playerTileY);
-    if (lootable && !lootable.looted) {
-      if (this.lootableCallback) {
-        this.lootableCallback(lootable);
+    
+    // Check for building entrances
+    const tileX = Math.floor(playerPos.x / 32);
+    const tileY = Math.floor(playerPos.y / 32);
+    const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
+    
+    if (tile?.isEntrance && (tile.buildingType || tile.regionType)) {
+      if (tile.buildingType) {
+        this.enterBuilding(tile.buildingType, tile.buildingName);
+      } else if (tile.regionType) {
+        this.enterRegion(tile.regionType, tile.regionName);
       }
       return;
     }
+
+    // Check for nearby NPCs
+    for (const npc of this.gameState.currentMap.npcs) {
+      const distance = Math.sqrt(
+        Math.pow(playerPos.x - npc.position.x, 2) + Math.pow(playerPos.y - npc.position.y, 2)
+      );
+      
+      if (distance < 64) {
+        this.startDialogue(npc.id);
+        this.updateQuestProgress('first_steps', 'talk_to_npc');
+        return;
+      }
+    }
+
+    // Check for nearby enemies
+    for (const enemy of this.gameState.currentMap.enemies) {
+      const distance = Math.sqrt(
+        Math.pow(playerPos.x - enemy.position.x, 2) + Math.pow(playerPos.y - enemy.position.y, 2)
+      );
+      
+      if (distance < 64) {
+        this.startCombat([enemy]);
+        return;
+      }
+    }
+
+    // Check for nearby lootables
+    for (const lootable of this.gameState.currentMap.lootables) {
+      const distance = Math.sqrt(
+        Math.pow(playerPos.x - lootable.position.x, 2) + Math.pow(playerPos.y - lootable.position.y, 2)
+      );
+      
+      if (distance < 64 && !lootable.looted) {
+        if (this.lootableCallback) {
+          this.lootableCallback(lootable);
+          this.updateQuestProgress('first_steps', 'collect_items');
+        }
+        return;
+      }
+    }
   }
 
-  private findNearbyNPC(playerX: number, playerY: number): NPC | null {
-    if (!this.gameState.currentMap.npcs) return null;
+  private startDialogue(npcId: string) {
+    const npc = this.gameState.currentMap.npcs.find(n => n.id === npcId);
+    if (!npc || npc.dialogue.length === 0) return;
 
-    return this.gameState.currentMap.npcs.find(npc => {
-      const npcTileX = Math.floor(npc.position.x / 32);
-      const npcTileY = Math.floor(npc.position.y / 32);
-      const distance = Math.abs(npcTileX - playerX) + Math.abs(npcTileY - playerY);
-      return distance <= 1;
-    }) || null;
-  }
-
-  private findNearbyEnemy(playerX: number, playerY: number): Enemy | null {
-    if (!this.gameState.currentMap.enemies) return null;
-
-    return this.gameState.currentMap.enemies.find(enemy => {
-      const enemyTileX = Math.floor(enemy.position.x / 32);
-      const enemyTileY = Math.floor(enemy.position.y / 32);
-      const distance = Math.abs(enemyTileX - playerX) + Math.abs(enemyTileY - playerY);
-      return distance <= 1;
-    }) || null;
-  }
-
-  private findNearbyLootable(playerX: number, playerY: number): any | null {
-    if (!this.gameState.currentMap.lootables) return null;
-
-    return this.gameState.currentMap.lootables.find(lootable => {
-      const lootTileX = Math.floor(lootable.position.x / 32);
-      const lootTileY = Math.floor(lootable.position.y / 32);
-      const distance = Math.abs(lootTileX - playerX) + Math.abs(lootTileY - playerY);
-      return distance <= 1;
-    }) || null;
-  }
-
-  private startDialogue(npc: NPC) {
     this.gameState.dialogue = {
-      npcId: npc.id,
-      currentNode: 'greeting',
-      history: [],
-      choices: npc.dialogue.find(d => d.id === 'greeting')?.choices || []
+      npcId,
+      currentNode: npc.dialogue[0].id,
+      history: [`${npc.name}: ${npc.dialogue[0].text}`],
+      choices: npc.dialogue[0].choices
     };
     this.gameState.gameMode = 'dialogue';
     this.notifyStateChange();
   }
 
+  private updateQuestProgress(questId: string, objectiveId: string, amount: number = 1) {
+    const quest = this.gameState.quests.find(q => q.id === questId);
+    if (quest && quest.status === 'active') {
+      const objective = quest.objectives.find(obj => obj.id === objectiveId);
+      if (objective && !objective.completed) {
+        objective.current = Math.min(objective.current + amount, objective.required);
+        if (objective.current >= objective.required) {
+          objective.completed = true;
+        }
+        this.notifyStateChange();
+      }
+    }
+  }
+
   private startCombat(enemies: Enemy[]) {
+    const participants = [this.gameState.player, ...enemies];
+    
+    // Sort by initiative (agility for now)
+    const turnOrder = [...participants].sort((a, b) => {
+      const aInit = 'stats' in a ? a.stats.agility : 10;
+      const bInit = 'stats' in b ? b.stats.agility : 10;
+      return bInit - aInit;
+    });
+
+    // Create simple battlefield
+    const battleground: Tile[][] = [];
+    for (let y = 0; y < 8; y++) {
+      const row: Tile[] = [];
+      for (let x = 0; x < 8; x++) {
+        row.push({
+          x,
+          y,
+          type: 'grass',
+          walkable: true,
+          sprite: 'grass',
+          discovered: true,
+          visible: true
+        });
+      }
+      battleground.push(row);
+    }
+
     this.gameState.combat = {
-      participants: [this.gameState.player, ...enemies],
-      turnOrder: [this.gameState.player, ...enemies],
+      participants,
+      turnOrder,
       currentTurn: 0,
       round: 1,
+      selectedAction: '',
       selectedTargets: [],
       animations: [],
-      battleground: [],
-      weather: this.gameState.weather,
+      battleground,
+      weather: 'clear',
       timeOfDay: 'day',
-      isPlayerTurn: true,
-      combatLog: [`Combat begins against ${enemies.map(e => e.name).join(', ')}!`]
+      isPlayerTurn: turnOrder[0] === this.gameState.player,
+      combatLog: ['Combat begins!']
     };
+
     this.gameState.gameMode = 'combat';
     this.notifyStateChange();
+
+    // If first turn is enemy, process it immediately
+    if (!this.gameState.combat.isPlayerTurn) {
+      setTimeout(() => this.processEnemyTurn(), 1000);
+    }
   }
 
-  private openInventory() {
-    this.gameState.gameMode = 'inventory';
+  public handleCombatAction(action: string, targetIndex?: number) {
+    if (!this.gameState.combat || !this.gameState.combat.isPlayerTurn) return;
+
+    const currentActor = this.gameState.combat.turnOrder[this.gameState.combat.currentTurn] as Character;
+    
+    // Handle consumable items
+    if (action.startsWith('use_')) {
+      const itemId = action.replace('use_', '');
+      this.useItemInCombat(currentActor, itemId, targetIndex);
+      this.nextTurn();
+      return;
+    }
+    
+    const skill = currentActor.skills.find(s => s.id === action);
+    
+    if (!skill || currentActor.energy < skill.energyCost) {
+      return;
+    }
+
+    if (targetIndex !== undefined && targetIndex >= 0) {
+      const target = this.gameState.combat.participants[targetIndex];
+      this.executeSkill(currentActor, skill, target);
+    }
+
+    this.nextTurn();
+  }
+
+  private useItemInCombat(user: Character, itemId: string, targetIndex?: number) {
+    const item = this.gameState.inventory.find(i => i.id === itemId);
+    if (!item || item.type !== 'consumable') return;
+
+    let target = user; // Default to self
+    if (targetIndex !== undefined && targetIndex >= 0) {
+      target = this.gameState.combat!.participants[targetIndex] as Character;
+    }
+
+    let logMessage = `${user.name} uses ${item.name}`;
+
+    // Apply item effects
+    switch (itemId) {
+      case 'stimpak':
+        const healing = 50;
+        const oldHealth = target.health;
+        target.health = Math.min(target.maxHealth, target.health + healing);
+        const actualHealing = target.health - oldHealth;
+        logMessage += ` healing ${target.name} for ${actualHealing} HP`;
+        break;
+        
+      case 'rad_away':
+        target.radiation = Math.max(0, target.radiation - 100);
+        logMessage += ` reducing ${target.name}'s radiation`;
+        break;
+        
+      case 'psycho':
+        target.statusEffects.push({
+          type: 'damage_boost',
+          duration: 5,
+          value: 25,
+          source: 'Psycho'
+        });
+        logMessage += ` boosting ${target.name}'s damage`;
+        break;
+        
+      case 'buffout':
+        target.statusEffects.push({
+          type: 'stat_boost',
+          duration: 5,
+          value: 3,
+          source: 'Buffout'
+        });
+        logMessage += ` boosting ${target.name}'s strength`;
+        break;
+        
+      case 'mentats':
+        target.statusEffects.push({
+          type: 'intelligence_boost',
+          duration: 5,
+          value: 3,
+          source: 'Mentats'
+        });
+        logMessage += ` boosting ${target.name}'s intelligence`;
+        break;
+    }
+
+    // Remove item from inventory
+    const itemIndex = this.gameState.inventory.findIndex(i => i.id === itemId);
+    if (itemIndex >= 0) {
+      const inventoryItem = this.gameState.inventory[itemIndex];
+      if (inventoryItem.quantity && inventoryItem.quantity > 1) {
+        inventoryItem.quantity--;
+      } else {
+        this.gameState.inventory.splice(itemIndex, 1);
+      }
+    }
+
+    this.gameState.combat!.combatLog.push(logMessage);
     this.notifyStateChange();
   }
 
-  private openEquipment() {
-    this.gameState.gameMode = 'equipment';
+  private executeSkill(actor: Character | Enemy, skill: Skill, target: Character | Enemy) {
+    if (!this.gameState.combat) return;
+
+    // Consume energy
+    actor.energy = Math.max(0, actor.energy - skill.energyCost);
+
+    let logMessage = `${actor.name} uses ${skill.name}`;
+
+    if (skill.damage) {
+      // Calculate damage
+      let damage = skill.damage;
+      
+      // Add equipment bonuses for characters
+      if ('stats' in actor) {
+        const character = actor as Character;
+        const strengthBonus = Math.floor(character.stats.strength / 2);
+        const equipmentDamage = (character as any).equipmentBonuses?.damage || 0;
+        
+        // Check for damage boost status effects
+        const damageBoost = character.statusEffects.find(e => e.type === 'damage_boost');
+        const boostMultiplier = damageBoost ? (1 + damageBoost.value / 100) : 1;
+        
+        damage = Math.floor((damage + strengthBonus + equipmentDamage) * boostMultiplier);
+      }
+      
+      // Calculate defense
+      let finalDamage = damage;
+      if ('class' in target) {
+        const character = target as Character;
+        const equipmentDefense = (character as any).equipmentBonuses?.defense || 0;
+        finalDamage = Math.max(1, damage - equipmentDefense);
+      }
+      
+      // Apply final damage
+      target.health = Math.max(0, target.health - finalDamage);
+      logMessage += ` dealing ${finalDamage} damage to ${target.name}`;
+      
+      // Check if target died
+      if (target.health <= 0) {
+        logMessage += ` - ${target.name} is defeated!`;
+        
+        // Remove from combat if it's an enemy
+        if (!('class' in target)) {
+          const enemyIndex = this.gameState.currentMap.enemies.findIndex(e => e.id === target.id);
+          if (enemyIndex >= 0) {
+            this.gameState.currentMap.enemies.splice(enemyIndex, 1);
+            
+            // Update quest progress for killing enemies
+            const enemyType = (target as Enemy).type;
+            if (enemyType === 'raider') {
+              this.updateQuestProgress('raider_threat', 'kill_raiders');
+            }
+            if (enemyType === 'robot') {
+              this.updateQuestProgress('water_chip_quest', 'defeat_security');
+            }
+          }
+        }
+      }
+    }
+
+    if (skill.healing) {
+      // Apply healing
+      const healing = skill.healing;
+      const oldHealth = target.health;
+      target.health = Math.min(target.maxHealth, target.health + healing);
+      const actualHealing = target.health - oldHealth;
+      logMessage += ` healing ${target.name} for ${actualHealing} HP`;
+    }
+
+    // Apply skill effects
+    if (skill.effect) {
+      target.statusEffects.push({
+        type: skill.effect.type,
+        duration: skill.effect.duration,
+        value: skill.effect.value,
+        source: actor.name
+      });
+      logMessage += ` applying ${skill.effect.type}`;
+    }
+
+    // Set cooldown
+    skill.currentCooldown = skill.cooldown;
+
+    this.gameState.combat.combatLog.push(logMessage);
     this.notifyStateChange();
   }
 
-  private openCharacterScreen() {
-    this.gameState.gameMode = 'character';
-    this.notifyStateChange();
+  private processEnemyTurn() {
+    if (!this.gameState.combat || this.gameState.combat.isPlayerTurn) return;
+
+    const currentEnemy = this.gameState.combat.turnOrder[this.gameState.combat.currentTurn] as Enemy;
+    
+    if (currentEnemy.health <= 0) {
+      this.nextTurn();
+      return;
+    }
+
+    // Simple AI: attack a random player character
+    const playerCharacters = this.gameState.combat.participants.filter(p => 'class' in p && p.health > 0);
+    
+    if (playerCharacters.length === 0) {
+      this.endCombat(false); // Player lost
+      return;
+    }
+
+    const target = playerCharacters[Math.floor(Math.random() * playerCharacters.length)];
+    const availableSkills = currentEnemy.skills.filter(s => 
+      currentEnemy.energy >= s.energyCost && s.currentCooldown <= 0
+    );
+
+    if (availableSkills.length > 0) {
+      const skill = availableSkills[Math.floor(Math.random() * availableSkills.length)];
+      this.executeSkill(currentEnemy, skill, target);
+    } else {
+      // Skip turn if no skills available
+      this.gameState.combat.combatLog.push(`${currentEnemy.name} has no available actions`);
+    }
+
+    setTimeout(() => this.nextTurn(), 1500);
   }
 
-  private openQuestScreen() {
-    this.gameState.gameMode = 'quests';
+  private nextTurn() {
+    if (!this.gameState.combat) return;
+
+    // Update cooldowns and status effects
+    this.updateCombatEffects();
+
+    // Check win/lose conditions
+    const aliveEnemies = this.gameState.combat.participants.filter(p => !('class' in p) && p.health > 0);
+    const aliveAllies = this.gameState.combat.participants.filter(p => 'class' in p && p.health > 0);
+
+    if (aliveEnemies.length === 0) {
+      this.endCombat(true); // Player won
+      return;
+    }
+
+    if (aliveAllies.length === 0) {
+      this.endCombat(false); // Player lost
+      return;
+    }
+
+    // Move to next turn
+    this.gameState.combat.currentTurn = (this.gameState.combat.currentTurn + 1) % this.gameState.combat.turnOrder.length;
+    
+    // Skip dead participants
+    let attempts = 0;
+    while (this.gameState.combat.turnOrder[this.gameState.combat.currentTurn].health <= 0 && attempts < 10) {
+      this.gameState.combat.currentTurn = (this.gameState.combat.currentTurn + 1) % this.gameState.combat.turnOrder.length;
+      attempts++;
+    }
+
+    // Check if new round
+    if (this.gameState.combat.currentTurn === 0) {
+      this.gameState.combat.round++;
+    }
+
+    // Determine if it's player turn
+    const currentActor = this.gameState.combat.turnOrder[this.gameState.combat.currentTurn];
+    this.gameState.combat.isPlayerTurn = 'class' in currentActor;
+
     this.notifyStateChange();
+
+    // If it's an enemy turn, process it
+    if (!this.gameState.combat.isPlayerTurn) {
+      setTimeout(() => this.processEnemyTurn(), 1000);
+    }
   }
 
-  private openMapScreen() {
-    this.gameState.gameMode = 'map';
-    this.notifyStateChange();
+  private updateCombatEffects() {
+    if (!this.gameState.combat) return;
+
+    for (const participant of this.gameState.combat.participants) {
+      // Update skill cooldowns
+      for (const skill of participant.skills) {
+        if (skill.currentCooldown > 0) {
+          skill.currentCooldown = Math.max(0, skill.currentCooldown - 1);
+        }
+      }
+
+      // Update status effects
+      participant.statusEffects = participant.statusEffects.filter(effect => {
+        effect.duration -= 1;
+        
+        if (effect.duration <= 0) {
+          return false; // Remove expired effects
+        }
+
+        // Apply effect
+        if (effect.type === 'poison' && effect.value > 0) {
+          participant.health = Math.max(0, participant.health - effect.value);
+          this.gameState.combat!.combatLog.push(`${participant.name} takes ${effect.value} poison damage`);
+        }
+
+        return true;
+      });
+
+      // Regenerate energy
+      participant.energy = Math.min(participant.maxEnergy, participant.energy + 5);
+    }
+  }
+
+  private endCombat(playerWon: boolean) {
+    if (!this.gameState.combat) return;
+
+    if (playerWon) {
+      this.gameState.combat.combatLog.push('Victory! You have defeated your enemies!');
+      
+      // Award experience and loot
+      let totalExp = 0;
+      for (const participant of this.gameState.combat.participants) {
+        if (!('class' in participant)) {
+          totalExp += (participant as Enemy).experience;
+        }
+      }
+      
+      this.gameState.player.experience += totalExp;
+      this.gameState.combat.combatLog.push(`Gained ${totalExp} experience!`);
+      
+      // Check for level up
+      while (this.gameState.player.experience >= this.gameState.player.experienceToNext) {
+        this.gameState.player.experience -= this.gameState.player.experienceToNext;
+        this.gameState.player.level++;
+        this.gameState.player.experienceToNext = this.gameState.player.level * 100;
+        this.gameState.player.maxHealth += 10;
+        this.gameState.player.maxEnergy += 5;
+        this.gameState.combat.combatLog.push(`Level up! You are now level ${this.gameState.player.level}!`);
+      }
+    } else {
+      this.gameState.combat.combatLog.push('Defeat! You have been overcome...');
+      // Reset player health to 1 to avoid game over
+      this.gameState.player.health = 0; // Allow game over
+    }
+
+    // End combat after a delay
+    setTimeout(() => {
+      this.gameState.combat = undefined;
+      this.gameState.gameMode = 'exploration';
+      this.notifyStateChange();
+    }, 3000);
   }
 
   private toggleDevMode() {
@@ -647,45 +1193,412 @@ export class GameEngine {
         }
       };
     }
+    
     this.gameState.devMode.enabled = !this.gameState.devMode.enabled;
     this.notifyStateChange();
   }
 
-  private openMainMenu() {
-    // This would typically pause the game and show a menu
-    console.log('Main menu requested');
+  private updateMovement(deltaTime: number) {
+    if (this.gameState.gameMode !== 'exploration' || this.shouldIgnoreHotkeys()) {
+      return;
+    }
+
+    const speed = 128; // pixels per second
+    const player = this.gameState.player;
+    let moved = false;
+
+    // Handle movement
+    if (this.keys['arrowup'] || this.keys['w']) {
+      const newY = player.position.y - speed * deltaTime;
+      if (this.isValidPosition(player.position.x, newY)) {
+        player.position.y = newY;
+        player.direction = 'up';
+        moved = true;
+      }
+    }
+    if (this.keys['arrowdown'] || this.keys['s']) {
+      const newY = player.position.y + speed * deltaTime;
+      if (this.isValidPosition(player.position.x, newY)) {
+        player.position.y = newY;
+        player.direction = 'down';
+        moved = true;
+      }
+    }
+    if (this.keys['arrowleft'] || this.keys['a']) {
+      const newX = player.position.x - speed * deltaTime;
+      if (this.isValidPosition(newX, player.position.y)) {
+        player.position.x = newX;
+        player.direction = 'left';
+        moved = true;
+      }
+    }
+    if (this.keys['arrowright'] || this.keys['d']) {
+      const newX = player.position.x + speed * deltaTime;
+      if (this.isValidPosition(newX, player.position.y)) {
+        player.position.x = newX;
+        player.direction = 'right';
+        moved = true;
+      }
+    }
+
+    if (moved) {
+      this.updateCamera();
+      this.updateVisibility();
+    }
   }
 
-  public setStateChangeCallback(callback: (newState: GameState) => void) {
-    this.stateChangeCallback = callback;
+  private isValidPosition(x: number, y: number): boolean {
+    const tileX = Math.floor(x / 32);
+    const tileY = Math.floor(y / 32);
+    
+    if (tileX < 0 || tileX >= this.gameState.currentMap.width || 
+        tileY < 0 || tileY >= this.gameState.currentMap.height) {
+      return false;
+    }
+    
+    const tile = this.gameState.currentMap.tiles[tileY][tileX];
+    return tile.walkable;
   }
 
-  public setLootableCallback(callback: (lootable: any) => void) {
-    this.lootableCallback = callback;
+  private updateCamera() {
+    const player = this.gameState.player;
+    this.gameState.camera.x = player.position.x - this.canvas.width / 2;
+    this.gameState.camera.y = player.position.y - this.canvas.height / 2;
+
+    // Clamp camera to map bounds
+    const mapWidth = this.gameState.currentMap.width * 32;
+    const mapHeight = this.gameState.currentMap.height * 32;
+    this.gameState.camera.x = Math.max(0, Math.min(mapWidth - this.canvas.width, this.gameState.camera.x));
+    this.gameState.camera.y = Math.max(0, Math.min(mapHeight - this.canvas.height, this.gameState.camera.y));
+  }
+
+  private updateVisibility() {
+    const player = this.gameState.player;
+    const visionRange = 160; // pixels
+    
+    // Initialize visibility map if needed
+    if (this.gameState.visibilityMap.length === 0) {
+      for (let y = 0; y < this.gameState.currentMap.height; y++) {
+        this.gameState.visibilityMap[y] = new Array(this.gameState.currentMap.width).fill(false);
+      }
+    }
+
+    // Update tile visibility
+    for (let y = 0; y < this.gameState.currentMap.height; y++) {
+      for (let x = 0; x < this.gameState.currentMap.width; x++) {
+        const tileX = x * 32 + 16;
+        const tileY = y * 32 + 16;
+        const distance = Math.sqrt(
+          Math.pow(player.position.x - tileX, 2) + Math.pow(player.position.y - tileY, 2)
+        );
+
+        if (distance <= visionRange) {
+          this.gameState.currentMap.tiles[y][x].discovered = true;
+          this.gameState.currentMap.tiles[y][x].visible = true;
+          this.gameState.visibilityMap[y][x] = true;
+        } else {
+          this.gameState.currentMap.tiles[y][x].visible = false;
+        }
+      }
+    }
+  }
+
+  private render() {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    if (this.gameState.gameMode !== 'exploration') {
+      // Show a simple message for non-exploration modes
+      this.ctx.fillStyle = '#000000';
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = '24px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText('Game View', this.canvas.width / 2, this.canvas.height / 2);
+      return;
+    }
+
+    // Render map tiles
+    this.renderMap();
+    
+    // Render entities
+    this.renderEntities();
+    
+    // Render UI
+    this.renderUI();
+  }
+
+  private renderMap() {
+    const camera = this.gameState.camera;
+    const tileSize = 32;
+    
+    const startX = Math.floor(camera.x / tileSize);
+    const startY = Math.floor(camera.y / tileSize);
+    const endX = Math.min(this.gameState.currentMap.width, startX + Math.ceil(this.canvas.width / tileSize) + 1);
+    const endY = Math.min(this.gameState.currentMap.height, startY + Math.ceil(this.canvas.height / tileSize) + 1);
+
+    for (let y = Math.max(0, startY); y < endY; y++) {
+      for (let x = Math.max(0, startX); x < endX; x++) {
+        const tile = this.gameState.currentMap.tiles[y][x];
+        if (!tile.discovered) continue;
+
+        const screenX = x * tileSize - camera.x;
+        const screenY = y * tileSize - camera.y;
+
+        // Choose color based on tile type
+        let color = '#4a7c59'; // grass
+        switch (tile.type) {
+          case 'dirt': color = '#8b4513'; break;
+          case 'stone': color = '#696969'; break;
+          case 'water': color = '#4682b4'; break;
+          case 'ruins': color = '#2f2f2f'; break;
+          case 'building': color = '#654321'; break;
+          case 'sand': color = '#f4a460'; break;
+        }
+
+        // Darken if not currently visible
+        if (!tile.visible) {
+          color = this.darkenColor(color, 0.5);
+        }
+
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(screenX, screenY, tileSize, tileSize);
+
+        // Add border
+        this.ctx.strokeStyle = '#333333';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(screenX, screenY, tileSize, tileSize);
+
+        // Mark building entrances
+        if (tile.isEntrance) {
+          this.ctx.fillStyle = '#ffff00';
+          this.ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
+          
+          const name = tile.buildingName || tile.regionName;
+          if (name) {
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = '10px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(name, screenX + 16, screenY - 5);
+          }
+        }
+        
+        // Mark exits in interiors
+        if (tile.isExit && this.gameState.currentMap.isInterior) {
+          this.ctx.fillStyle = '#00ff00';
+          this.ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+          
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.font = '10px Arial';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('EXIT', screenX + 16, screenY + 18);
+        }
+      }
+    }
+  }
+
+  private renderEntities() {
+    const camera = this.gameState.camera;
+
+    // Render lootables
+    for (const lootable of this.gameState.currentMap.lootables) {
+      if (lootable.looted) continue;
+      
+      const tileX = Math.floor(lootable.position.x / 32);
+      const tileY = Math.floor(lootable.position.y / 32);
+      const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
+      
+      if (!tile?.discovered) continue;
+
+      const screenX = lootable.position.x - camera.x;
+      const screenY = lootable.position.y - camera.y;
+
+      this.ctx.fillStyle = lootable.type === 'corpse' ? '#8b0000' : '#daa520';
+      this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+    }
+
+    // Render NPCs
+    for (const npc of this.gameState.currentMap.npcs) {
+      const tileX = Math.floor(npc.position.x / 32);
+      const tileY = Math.floor(npc.position.y / 32);
+      const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
+      
+      if (!tile?.discovered) continue;
+
+      const screenX = npc.position.x - camera.x;
+      const screenY = npc.position.y - camera.y;
+
+      this.ctx.fillStyle = npc.isHostile ? '#ff4444' : '#44ff44';
+      this.ctx.beginPath();
+      this.ctx.arc(screenX, screenY, 12, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Name label
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = '12px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText(npc.name, screenX, screenY - 20);
+    }
+
+    // Render enemies
+    for (const enemy of this.gameState.currentMap.enemies) {
+      const tileX = Math.floor(enemy.position.x / 32);
+      const tileY = Math.floor(enemy.position.y / 32);
+      const tile = this.gameState.currentMap.tiles[tileY]?.[tileX];
+      
+      if (!tile?.discovered) continue;
+
+      const screenX = enemy.position.x - camera.x;
+      const screenY = enemy.position.y - camera.y;
+
+      this.ctx.fillStyle = '#ff0000';
+      this.ctx.fillRect(screenX - 10, screenY - 10, 20, 20);
+
+      // Health bar
+      const healthPercent = enemy.health / enemy.maxHealth;
+      this.ctx.fillStyle = '#000000';
+      this.ctx.fillRect(screenX - 12, screenY - 18, 24, 4);
+      this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
+      this.ctx.fillRect(screenX - 12, screenY - 18, 24 * healthPercent, 4);
+    }
+
+    // Render player
+    const player = this.gameState.player;
+    const screenX = player.position.x - camera.x;
+    const screenY = player.position.y - camera.y;
+
+    this.ctx.fillStyle = '#0066ff';
+    this.ctx.beginPath();
+    this.ctx.arc(screenX, screenY, 14, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // Player direction indicator
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.beginPath();
+    switch (player.direction) {
+      case 'up':
+        this.ctx.moveTo(screenX, screenY - 8);
+        this.ctx.lineTo(screenX - 4, screenY + 4);
+        this.ctx.lineTo(screenX + 4, screenY + 4);
+        break;
+      case 'down':
+        this.ctx.moveTo(screenX, screenY + 8);
+        this.ctx.lineTo(screenX - 4, screenY - 4);
+        this.ctx.lineTo(screenX + 4, screenY - 4);
+        break;
+      case 'left':
+        this.ctx.moveTo(screenX - 8, screenY);
+        this.ctx.lineTo(screenX + 4, screenY - 4);
+        this.ctx.lineTo(screenX + 4, screenY + 4);
+        break;
+      case 'right':
+        this.ctx.moveTo(screenX + 8, screenY);
+        this.ctx.lineTo(screenX - 4, screenY - 4);
+        this.ctx.lineTo(screenX - 4, screenY + 4);
+        break;
+    }
+    this.ctx.closePath();
+    this.ctx.fill();
+  }
+
+  private renderUI() {
+    // Health bar
+    const player = this.gameState.player;
+    const healthPercent = player.health / player.maxHealth;
+    
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    this.ctx.fillRect(10, 10, 200, 30);
+    
+    this.ctx.fillStyle = '#ff0000';
+    this.ctx.fillRect(15, 15, 190 * healthPercent, 20);
+    
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = '14px Arial';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`Health: ${player.health}/${player.maxHealth}`, 20, 30);
+
+    // Energy bar
+    const energyPercent = player.energy / player.maxEnergy;
+    
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    this.ctx.fillRect(10, 50, 200, 30);
+    
+    this.ctx.fillStyle = '#0066ff';
+    this.ctx.fillRect(15, 55, 190 * energyPercent, 20);
+    
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.fillText(`Energy: ${Math.floor(player.energy)}/${player.maxEnergy}`, 20, 70);
+
+    // Level and experience
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    this.ctx.fillRect(10, 90, 200, 30);
+    
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.fillText(`Level ${player.level} - ${player.experience}/${player.experienceToNext} XP`, 20, 110);
+
+    // Current area
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    this.ctx.fillRect(10, 130, 200, 25);
+    
+    this.ctx.fillStyle = '#ffff00';
+    this.ctx.font = '12px Arial';
+    this.ctx.fillText(this.gameState.currentMap.name, 15, 147);
+    
+    // Show exit hint when in interior
+    if (this.gameState.currentMap.isInterior) {
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      this.ctx.fillRect(10, 160, 250, 25);
+      
+      this.ctx.fillStyle = '#00ff00';
+      this.ctx.font = '12px Arial';
+      this.ctx.fillText('Press F or Space near green EXIT tiles to leave', 15, 177);
+    }
+  }
+
+  private darkenColor(color: string, factor: number): string {
+    const hex = color.replace('#', '');
+    const r = Math.floor(parseInt(hex.substr(0, 2), 16) * factor);
+    const g = Math.floor(parseInt(hex.substr(2, 2), 16) * factor);
+    const b = Math.floor(parseInt(hex.substr(4, 2), 16) * factor);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  private startGameLoop() {
+    const gameLoop = (currentTime: number) => {
+      const deltaTime = (currentTime - this.lastTime) / 1000;
+      this.lastTime = currentTime;
+
+      this.update(deltaTime);
+      this.render();
+
+      this.animationId = requestAnimationFrame(gameLoop);
+    };
+
+    this.animationId = requestAnimationFrame(gameLoop);
+  }
+
+  private update(deltaTime: number) {
+    this.updateMovement(deltaTime);
+    
+    // Update game time
+    this.gameState.gameTime += deltaTime;
+    this.gameState.statistics.playtime += deltaTime;
+    
+    // Update day/night cycle
+    this.gameState.dayNightCycle = (this.gameState.dayNightCycle + deltaTime / 1200) % 1;
   }
 
   private notifyStateChange() {
     if (this.stateChangeCallback) {
-      this.stateChangeCallback(JSON.parse(JSON.stringify(this.gameState)));
+      this.stateChangeCallback(this.getGameState());
     }
-  }
-
-  public setGameState(newState: GameState) {
-    this.gameState = JSON.parse(JSON.stringify(newState));
-  }
-
-  public getGameState(): GameState {
-    return JSON.parse(JSON.stringify(this.gameState));
-  }
-
-  public handleCombatAction(action: string, targetIndex?: number) {
-    // Combat action handling would go here
-    console.log('Combat action:', action, targetIndex);
   }
 
   public destroy() {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
     }
+    
+    window.removeEventListener('keydown', this.handleKeyPress);
+    window.removeEventListener('keyup', this.handleKeyPress);
   }
 }
