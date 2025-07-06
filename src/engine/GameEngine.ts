@@ -219,6 +219,11 @@ export class GameEngine {
     });
 
     if (nearbyEnemy) {
+      // Remove the enemy from the map when combat starts
+      const enemyIndex = this.gameState.currentMap.enemies.indexOf(nearbyEnemy);
+      if (enemyIndex > -1) {
+        this.gameState.currentMap.enemies.splice(enemyIndex, 1);
+      }
       this.startCombat([nearbyEnemy]);
       return;
     }
@@ -748,8 +753,55 @@ export class GameEngine {
         if (screenX < -16 || screenX > this.canvas.width + 16 || 
             screenY < -16 || screenY > this.canvas.height + 16) return;
         
-        this.ctx.fillStyle = npc.isHostile ? '#ff4444' : '#44ff44';
-        this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+        // Draw NPC with distinct appearance
+        if (npc.type === 'trader') {
+          // Trader - Blue circle with $ symbol
+          this.ctx.fillStyle = '#4a90e2';
+          this.ctx.beginPath();
+          this.ctx.arc(screenX, screenY, 12, 0, 2 * Math.PI);
+          this.ctx.fill();
+          
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.font = 'bold 14px Arial';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('$', screenX, screenY + 4);
+        } else if (npc.type === 'quest_giver') {
+          // Quest giver - Yellow diamond with !
+          this.ctx.fillStyle = '#ffd700';
+          this.ctx.save();
+          this.ctx.translate(screenX, screenY);
+          this.ctx.rotate(Math.PI / 4);
+          this.ctx.fillRect(-10, -10, 20, 20);
+          this.ctx.restore();
+          
+          this.ctx.fillStyle = '#000000';
+          this.ctx.font = 'bold 16px Arial';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('!', screenX, screenY + 5);
+        } else {
+          // Regular NPC - Green circle
+          this.ctx.fillStyle = npc.isHostile ? '#ff4444' : '#44ff44';
+          this.ctx.beginPath();
+          this.ctx.arc(screenX, screenY, 10, 0, 2 * Math.PI);
+          this.ctx.fill();
+          
+          // Add a small white dot in center
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.beginPath();
+          this.ctx.arc(screenX, screenY, 3, 0, 2 * Math.PI);
+          this.ctx.fill();
+        }
+        
+        // Add name label if not low performance
+        if (!this.isLowPerformanceDevice) {
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.font = '10px Arial';
+          this.ctx.textAlign = 'center';
+          this.ctx.strokeStyle = '#000000';
+          this.ctx.lineWidth = 2;
+          this.ctx.strokeText(npc.name, screenX, screenY - 18);
+          this.ctx.fillText(npc.name, screenX, screenY - 18);
+        }
       }
     });
     
@@ -768,8 +820,77 @@ export class GameEngine {
         if (screenX < -16 || screenX > this.canvas.width + 16 || 
             screenY < -16 || screenY > this.canvas.height + 16) return;
         
-        this.ctx.fillStyle = '#ff0000';
-        this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+        // Draw enemy with menacing appearance
+        if (enemy.type === 'raider') {
+          // Raider - Red spiky shape
+          this.ctx.fillStyle = '#cc0000';
+          this.ctx.beginPath();
+          for (let i = 0; i < 8; i++) {
+            const angle = (i * Math.PI) / 4;
+            const radius = i % 2 === 0 ? 12 : 8;
+            const x = screenX + Math.cos(angle) * radius;
+            const y = screenY + Math.sin(angle) * radius;
+            if (i === 0) this.ctx.moveTo(x, y);
+            else this.ctx.lineTo(x, y);
+          }
+          this.ctx.closePath();
+          this.ctx.fill();
+        } else if (enemy.type === 'mutant') {
+          // Mutant - Green irregular blob
+          this.ctx.fillStyle = '#00aa00';
+          this.ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const angle = (i * Math.PI * 2) / 6;
+            const radius = 10 + Math.sin(angle * 3) * 3;
+            const x = screenX + Math.cos(angle) * radius;
+            const y = screenY + Math.sin(angle) * radius;
+            if (i === 0) this.ctx.moveTo(x, y);
+            else this.ctx.lineTo(x, y);
+          }
+          this.ctx.closePath();
+          this.ctx.fill();
+        } else if (enemy.type === 'robot') {
+          // Robot - Gray square with circuits
+          this.ctx.fillStyle = '#666666';
+          this.ctx.fillRect(screenX - 10, screenY - 10, 20, 20);
+          
+          // Add circuit lines
+          this.ctx.strokeStyle = '#00ffff';
+          this.ctx.lineWidth = 2;
+          this.ctx.beginPath();
+          this.ctx.moveTo(screenX - 8, screenY - 8);
+          this.ctx.lineTo(screenX + 8, screenY + 8);
+          this.ctx.moveTo(screenX + 8, screenY - 8);
+          this.ctx.lineTo(screenX - 8, screenY + 8);
+          this.ctx.stroke();
+        } else {
+          // Default enemy - Red triangle
+          this.ctx.fillStyle = '#ff0000';
+          this.ctx.beginPath();
+          this.ctx.moveTo(screenX, screenY - 12);
+          this.ctx.lineTo(screenX - 10, screenY + 8);
+          this.ctx.lineTo(screenX + 10, screenY + 8);
+          this.ctx.closePath();
+          this.ctx.fill();
+        }
+        
+        // Health bar for enemies
+        if (!this.isLowPerformanceDevice) {
+          const healthPercent = enemy.health / enemy.maxHealth;
+          this.ctx.fillStyle = '#333333';
+          this.ctx.fillRect(screenX - 12, screenY - 20, 24, 4);
+          this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
+          this.ctx.fillRect(screenX - 12, screenY - 20, 24 * healthPercent, 4);
+          
+          // Enemy name
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.font = '10px Arial';
+          this.ctx.textAlign = 'center';
+          this.ctx.strokeStyle = '#000000';
+          this.ctx.lineWidth = 2;
+          this.ctx.strokeText(enemy.name, screenX, screenY + 25);
+          this.ctx.fillText(enemy.name, screenX, screenY + 25);
+        }
       }
     });
   }
@@ -893,10 +1014,260 @@ export class GameEngine {
           this.ctx.strokeRect(screenX, screenY, 32, 32);
         }
         
-        // Render entrance indicator for enterable buildings
-        if (!isInterior && tile.isEnterable && tile.visible && !this.isLowPerformanceDevice) {
-          this.ctx.fillStyle = '#ffff00';
-          this.ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
+        // Render building indicators
+        if (!isInterior && tile.type === 'building' && tile.visible) {
+          // Different building types get different colors and symbols
+          if (tile.buildingType === 'trader_post' || tile.buildingType === 'market') {
+            this.ctx.fillStyle = '#4a90e2';
+            this.ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('$', screenX + 16, screenY + 20);
+          } else if (tile.buildingType === 'clinic') {
+            this.ctx.fillStyle = '#ff6b6b';
+            this.ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('+', screenX + 16, screenY + 20);
+          } else if (tile.buildingType === 'workshop' || tile.buildingType === 'armory') {
+            this.ctx.fillStyle = '#ffa500';
+            this.ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+            this.ctx.fillStyle = '#000000';
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('⚒', screenX + 16, screenY + 20);
+          } else if (tile.buildingType === 'tavern') {
+            this.ctx.fillStyle = '#8b4513';
+            this.ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('🍺', screenX + 16, screenY + 20);
+          } else {
+            // Generic building
+            this.ctx.fillStyle = '#8b4513';
+            this.ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+          }
+          
+          // Add entrance indicator for enterable buildings
+          if (tile.isEnterable && !this.isLowPerformanceDevice) {
+            this.ctx.fillStyle = '#ffff00';
+            this.ctx.fillRect(screenX + 12, screenY + 26, 8, 4);
+            this.ctx.fillStyle = '#000000';
+            this.ctx.font = '8px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('E', screenX + 16, screenY + 29);
+          }
+        }
+      }
+    }
+  }
+
+  private renderNPCs() {
+    this.gameState.currentMap.npcs.forEach(npc => {
+      const screenX = npc.position.x - this.gameState.camera.x;
+      const screenY = npc.position.y - this.gameState.camera.y;
+
+      if (screenX < -32 || screenX > this.canvas.width + 32 || 
+          screenY < -32 || screenY > this.canvas.height + 32) return;
+
+      const tileX = Math.floor(npc.position.x / 32);
+      const tileY = Math.floor(npc.position.y / 32);
+      if (!this.gameState.currentMap.tiles[tileY]?.[tileX]?.discovered) return;
+
+      // Draw NPC with type-specific appearance
+      if (npc.type === 'trader') {
+        // Trader - Blue with $ symbol
+        this.ctx.fillStyle = '#4a90e2';
+        this.ctx.fillRect(screenX - 12, screenY - 12, 24, 24);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 16px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('$', screenX, screenY + 4);
+      } else if (npc.type === 'quest_giver') {
+        // Quest giver - Yellow with ! symbol
+        this.ctx.fillStyle = '#ffd700';
+        this.ctx.fillRect(screenX - 12, screenY - 12, 24, 24);
+        this.ctx.fillStyle = '#000000';
+        this.ctx.font = 'bold 18px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('!', screenX, screenY + 6);
+      } else {
+        // Regular NPC
+        this.ctx.fillStyle = npc.isHostile ? '#ff4444' : '#44ff44';
+        this.ctx.fillRect(screenX - 10, screenY - 10, 20, 20);
+        
+        // Add face indicator
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillRect(screenX - 2, screenY - 6, 1, 1); // Left eye
+        this.ctx.fillRect(screenX + 2, screenY - 6, 1, 1); // Right eye
+        this.ctx.fillRect(screenX - 3, screenY + 2, 6, 1); // Mouth
+      }
+
+      if (!this.isLowPerformanceDevice) {
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '10px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.strokeStyle = '#000000';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeText(npc.name, screenX, screenY - 18);
+        this.ctx.fillText(npc.name, screenX, screenY - 18);
+      }
+    });
+  }
+
+  private renderEnemies() {
+    this.gameState.currentMap.enemies.forEach(enemy => {
+      const screenX = enemy.position.x - this.gameState.camera.x;
+      const screenY = enemy.position.y - this.gameState.camera.y;
+
+      if (screenX < -32 || screenX > this.canvas.width + 32 || 
+          screenY < -32 || screenY > this.canvas.height + 32) return;
+
+      const tileX = Math.floor(enemy.position.x / 32);
+      const tileY = Math.floor(enemy.position.y / 32);
+      if (!this.gameState.currentMap.tiles[tileY]?.[tileX]?.discovered) return;
+
+      // Draw enemy with type-specific menacing appearance
+      if (enemy.type === 'raider') {
+        // Raider - Red spiky shape
+        this.ctx.fillStyle = '#cc0000';
+        this.ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const angle = (i * Math.PI) / 4;
+          const radius = i % 2 === 0 ? 12 : 8;
+          const x = screenX + Math.cos(angle) * radius;
+          const y = screenY + Math.sin(angle) * radius;
+          if (i === 0) this.ctx.moveTo(x, y);
+          else this.ctx.lineTo(x, y);
+        }
+        this.ctx.closePath();
+        this.ctx.fill();
+        
+        // Add weapon indicator
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(screenX - 8, screenY - 8);
+        this.ctx.lineTo(screenX + 8, screenY + 8);
+        this.ctx.stroke();
+      } else if (enemy.type === 'mutant') {
+        // Mutant - Green irregular blob
+        this.ctx.fillStyle = '#00aa00';
+        this.ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (i * Math.PI * 2) / 6;
+          const radius = 10 + Math.sin(angle * 3) * 3;
+          const x = screenX + Math.cos(angle) * radius;
+          const y = screenY + Math.sin(angle) * radius;
+          if (i === 0) this.ctx.moveTo(x, y);
+          else this.ctx.lineTo(x, y);
+        }
+        this.ctx.closePath();
+        this.ctx.fill();
+        
+        // Add mutation spots
+        this.ctx.fillStyle = '#ffff00';
+        this.ctx.fillRect(screenX - 3, screenY - 3, 2, 2);
+        this.ctx.fillRect(screenX + 2, screenY + 1, 2, 2);
+      } else if (enemy.type === 'robot') {
+        // Robot - Gray square with circuits
+        this.ctx.fillStyle = '#666666';
+        this.ctx.fillRect(screenX - 10, screenY - 10, 20, 20);
+        
+        // Add circuit lines
+        this.ctx.strokeStyle = '#00ffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(screenX - 8, screenY - 8);
+        this.ctx.lineTo(screenX + 8, screenY + 8);
+        this.ctx.moveTo(screenX + 8, screenY - 8);
+        this.ctx.lineTo(screenX - 8, screenY + 8);
+        this.ctx.stroke();
+        
+        // Add glowing eyes
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.fillRect(screenX - 6, screenY - 6, 3, 3);
+        this.ctx.fillRect(screenX + 3, screenY - 6, 3, 3);
+      } else {
+        // Default enemy - Red triangle
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.beginPath();
+        this.ctx.moveTo(screenX, screenY - 12);
+        this.ctx.lineTo(screenX - 10, screenY + 8);
+        this.ctx.lineTo(screenX + 10, screenY + 8);
+        this.ctx.closePath();
+        this.ctx.fill();
+        
+        // Add angry eyes
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillRect(screenX - 4, screenY - 4, 2, 2);
+        this.ctx.fillRect(screenX + 2, screenY - 4, 2, 2);
+      }
+
+      if (!this.isLowPerformanceDevice) {
+        const healthPercent = enemy.health / enemy.maxHealth;
+        this.ctx.fillStyle = '#333333';
+        this.ctx.fillRect(screenX - 12, screenY - 18, 24, 4);
+        this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
+        this.ctx.fillRect(screenX - 12, screenY - 18, 24 * healthPercent, 4);
+
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '10px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.strokeStyle = '#000000';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeText(enemy.name, screenX, screenY + 25);
+        this.ctx.fillText(enemy.name, screenX, screenY + 25);
+      }
+    });
+  }
+
+  private renderLootables() {
+    this.gameState.currentMap.lootables.forEach(lootable => {
+      if (lootable.looted) return;
+
+      const screenX = lootable.position.x - this.gameState.camera.x;
+      const screenY = lootable.position.y - this.gameState.camera.y;
+
+      if (screenX < -32 || screenX > this.canvas.width + 32 || 
+          screenY < -32 || screenY > this.canvas.height + 32) return;
+
+      const tileX = Math.floor(lootable.position.x / 32);
+      const tileY = Math.floor(lootable.position.y / 32);
+      if (!this.gameState.currentMap.tiles[tileY]?.[tileX]?.discovered) return;
+
+      // Different lootable types get different appearances
+      if (lootable.type === 'container') {
+        this.ctx.fillStyle = '#8b4513';
+        this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+        this.ctx.fillStyle = '#ffaa00';
+        this.ctx.fillRect(screenX - 6, screenY - 2, 12, 4);
+      } else if (lootable.type === 'corpse') {
+        this.ctx.fillStyle = '#666666';
+        this.ctx.fillRect(screenX - 10, screenY - 4, 20, 8);
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.fillRect(screenX - 8, screenY - 2, 4, 4);
+      } else {
+        // Cache - glowing treasure
+        this.ctx.fillStyle = '#ffd700';
+        this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+      }
+      
+      if (!this.isLowPerformanceDevice) {
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.strokeStyle = '#000000';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeText('?', screenX, screenY + 4);
+        this.ctx.fillText('?', screenX, screenY + 4);
+      }
+    });
+  }
+
           this.ctx.fillStyle = '#000000';
           this.ctx.font = '14px Arial';
           this.ctx.textAlign = 'center';
