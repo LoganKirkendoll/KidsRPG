@@ -45,8 +45,8 @@ const createTile = (x: number, y: number, type: string, walkable: boolean = true
   type: type as any,
   walkable,
   sprite: type,
-  discovered: false,
-  visible: false,
+  discovered: true,
+  visible: true,
   description: `${type} terrain`
 });
 

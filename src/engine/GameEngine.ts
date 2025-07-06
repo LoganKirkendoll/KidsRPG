@@ -642,17 +642,33 @@ export class GameEngine {
   }
   
   private renderLowGraphics() {
+    // Ensure we have valid render bounds
+    const actualMapHeight = this.gameState.currentMap.tiles.length;
+    const actualMapWidth = this.gameState.currentMap.tiles[0]?.length || 0;
+    
+    // Clamp render bounds to actual map size
+    const startY = Math.max(0, Math.min(this.renderBounds.startY, actualMapHeight - 1));
+    const endY = Math.min(this.renderBounds.endY, actualMapHeight);
+    const startX = Math.max(0, Math.min(this.renderBounds.startX, actualMapWidth - 1));
+    const endX = Math.min(this.renderBounds.endX, actualMapWidth);
+    
     // Only render visible tiles with simple colors
-    for (let y = this.renderBounds.startY; y < this.renderBounds.endY; y++) {
-      for (let x = this.renderBounds.startX; x < this.renderBounds.endX; x++) {
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        if (!this.gameState.currentMap.tiles[y] || !this.gameState.currentMap.tiles[y][x]) {
+          continue;
+        }
+        
         const tile = this.gameState.currentMap.tiles[y][x];
-        if (!tile.discovered) continue;
+        
+        // For interior maps, always render tiles
+        if (!this.gameState.currentMap.isInterior && !tile.discovered) continue;
 
         const screenX = x * 32 - this.gameState.camera.x;
         const screenY = y * 32 - this.gameState.camera.y;
 
         let color = this.getTileColor(tile.type);
-        if (!tile.visible) {
+        if (!this.gameState.currentMap.isInterior && !tile.visible) {
           color = this.darkenColor(color, 0.5);
         }
 
