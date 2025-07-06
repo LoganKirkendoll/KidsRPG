@@ -12,6 +12,7 @@ export class GameEngine {
   private stateChangeCallback?: (newState: GameState) => void;
   private lootableCallback?: (lootable: any) => void;
   private loadedMaps: { [key: string]: GameMap } = {};
+  private isTransitioning = false;
 
   constructor(canvas: HTMLCanvasElement, initialGameState: GameState, settings?: any) {
     this.canvas = canvas;
@@ -195,6 +196,7 @@ export class GameEngine {
 
   private updatePlayerMovement(deltaTime: number) {
     if (this.gameState.gameMode !== 'exploration') return;
+    if (this.isTransitioning) return; // Prevent movement during transitions
 
     const speed = 128; // pixels per second
     const moveDistance = speed * (deltaTime / 1000);
@@ -260,6 +262,10 @@ export class GameEngine {
   }
 
   private handleMapTransition(newX: number, newY: number, mapWidth: number, mapHeight: number) {
+    if (this.isTransitioning) return; // Prevent multiple transitions
+    
+    this.isTransitioning = true;
+    
     let direction: 'north' | 'south' | 'east' | 'west' | null = null;
     
     if (newX < 0) direction = 'west';
@@ -307,8 +313,10 @@ export class GameEngine {
     // Notify state change
     this.notifyStateChange();
     
-    // Prevent further movement processing this frame
-    return;
+    // Reset transition flag after a short delay to prevent immediate re-triggering
+    setTimeout(() => {
+      this.isTransitioning = false;
+    }, 100);
   }
 
   private isValidPosition(tileX: number, tileY: number): boolean {
