@@ -657,7 +657,7 @@ export class GameEngine {
           walkable: true,
           sprite: 'grass',
           discovered: true,
-          visible: true
+          visible: true,
           description,
           isExit
       battleground.push(row);
