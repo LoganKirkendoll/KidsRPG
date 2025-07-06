@@ -319,27 +319,6 @@ export const createCapitalWasteland = (): GameMap => {
     createBuildingArea(tiles, area.x, area.y, area.radius, 'ruins');
   });
   
-  // Add enemies to the map
-  const mapEnemies = [
-    // Raiders near settlements
-    { ...enemies.find(e => e.id === 'raider_scavenger')!, position: { x: 20 * 32, y: 20 * 32 } },
-    { ...enemies.find(e => e.id === 'raider_scavenger')!, position: { x: 70 * 32, y: 30 * 32 } },
-    { ...enemies.find(e => e.id === 'raider_scavenger')!, position: { x: 90 * 32, y: 80 * 32 } },
-    
-    // Mutants in ruins
-    { ...enemies.find(e => e.id === 'feral_ghoul')!, position: { x: 10 * 32, y: 50 * 32 } },
-    { ...enemies.find(e => e.id === 'feral_ghoul')!, position: { x: 100 * 32, y: 20 * 32 } },
-    
-    // Robots in tech areas
-    { ...enemies.find(e => e.id === 'enclave_soldier')!, position: { x: 15 * 32, y: 15 * 32 } }, // Near Vault 101
-    
-    // Super mutants in dangerous areas
-    { ...enemies.find(e => e.id === 'super_mutant_brute')!, position: { x: 110 * 32, y: 110 * 32 } },
-    
-    // Deathclaw as rare encounter
-    { ...enemies.find(e => e.id === 'deathclaw')!, position: { x: 5 * 32, y: 5 * 32 } }
-  ].filter(Boolean); // Remove any undefined enemies
-  
   const connections: MapConnection[] = [
     {
       direction: 'north',
@@ -375,7 +354,7 @@ export const createCapitalWasteland = (): GameMap => {
     name: 'Capital Wasteland',
     bgMusic: 'wasteland_ambient',
     npcs: npcs.filter(npc => !npc.mapId || npc.mapId === 'capital_wasteland'),
-    enemies: mapEnemies,
+    enemies: enemies.filter(enemy => !enemy.mapId || enemy.mapId === 'capital_wasteland'),
     lootables: createLootables(width, height, 0.003), // Very rare lootables
     connections
   };
@@ -441,13 +420,6 @@ export const createNorthernWasteland = (): GameMap => {
     createPath(tiles, buildingCenterX, buildingCenterY, buildingCenterX, nearestRoadY, 'stone');
   });
   
-  // Add industrial enemies
-  const industrialEnemies = [
-    { ...enemies.find(e => e.id === 'trog')!, position: { x: 25 * 32, y: 25 * 32 } },
-    { ...enemies.find(e => e.id === 'pitt_raider')!, position: { x: 45 * 32, y: 40 * 32 } },
-    { ...enemies.find(e => e.id === 'wildman')!, position: { x: 15 * 32, y: 50 * 32 } }
-  ].filter(Boolean);
-  
   const connections: MapConnection[] = [
     {
       direction: 'south',
@@ -471,7 +443,7 @@ export const createNorthernWasteland = (): GameMap => {
     name: 'Northern Wasteland',
     bgMusic: 'industrial_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'northern_wasteland'),
-    enemies: industrialEnemies,
+    enemies: enemies.filter(enemy => enemy.mapId === 'northern_wasteland'),
     lootables: createLootables(width, height, 0.008), // Slightly more in industrial areas
     connections
   };
@@ -529,13 +501,6 @@ export const createSouthernRuins = (): GameMap => {
     createBuilding(tiles, building.x, building.y, building.width, building.height, building.type, building.name);
   });
   
-  // Add urban enemies
-  const urbanEnemies = [
-    { ...enemies.find(e => e.id === 'swampfolk')!, position: { x: 20 * 32, y: 20 * 32 } },
-    { ...enemies.find(e => e.id === 'mirelurk')!, position: { x: 40 * 32, y: 30 * 32 } },
-    { ...enemies.find(e => e.id === 'tribal_warrior')!, position: { x: 50 * 32, y: 50 * 32 } }
-  ].filter(Boolean);
-  
   const connections: MapConnection[] = [
     {
       direction: 'north',
@@ -559,7 +524,7 @@ export const createSouthernRuins = (): GameMap => {
     name: 'Southern Ruins',
     bgMusic: 'ruins_ambient',
     npcs: npcs.filter(npc => npc.mapId === 'southern_ruins'),
-    enemies: urbanEnemies,
+    enemies: enemies.filter(enemy => enemy.mapId === 'southern_ruins'),
     lootables: createLootables(width, height, 0.006), // Moderate in ruins
     connections
   };

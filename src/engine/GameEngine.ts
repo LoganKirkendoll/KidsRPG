@@ -1,6 +1,3 @@
-Here's the fixed version with all missing closing brackets and proper whitespace:
-
-```typescript
 import { GameState, Position, Character, Enemy, NPC, Tile, GameMap } from '../types/game';
 import { maps } from '../data/maps';
 import { getBuildingByPosition, getBuildingById } from '../data/buildings';
@@ -730,3 +727,423 @@ export class GameEngine {
     this.renderPlayer();
     this.renderNearbyEntities();
     this.renderSimpleUI();
+  }
+  
+  private renderNearbyEntities() {
+    const playerPos = this.gameState.player.position;
+    const renderDistance = this.isLowPerformanceDevice ? 150 : 200;
+    
+    // Render nearby NPCs
+    this.gameState.currentMap.npcs.forEach(npc => {
+      const distance = Math.sqrt(
+        Math.pow(npc.position.x - playerPos.x, 2) + 
+        Math.pow(npc.position.y - playerPos.y, 2)
+      );
+      
+      if (distance <= renderDistance) {
+        const screenX = npc.position.x - this.gameState.camera.x;
+        const screenY = npc.position.y - this.gameState.camera.y;
+        
+        // Skip if off-screen
+        if (screenX < -16 || screenX > this.canvas.width + 16 || 
+            screenY < -16 || screenY > this.canvas.height + 16) return;
+        
+        this.ctx.fillStyle = npc.isHostile ? '#ff4444' : '#44ff44';
+        this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+      }
+    });
+    
+    // Render nearby enemies
+    this.gameState.currentMap.enemies.forEach(enemy => {
+      const distance = Math.sqrt(
+        Math.pow(enemy.position.x - playerPos.x, 2) + 
+        Math.pow(enemy.position.y - playerPos.y, 2)
+      );
+      
+      if (distance <= renderDistance) {
+        const screenX = enemy.position.x - this.gameState.camera.x;
+        const screenY = enemy.position.y - this.gameState.camera.y;
+        
+        // Skip if off-screen
+        if (screenX < -16 || screenX > this.canvas.width + 16 || 
+            screenY < -16 || screenY > this.canvas.height + 16) return;
+        
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+      }
+    });
+  }
+  
+  private enterBuilding(buildingId: string) {
+    const building = getBuildingById(buildingId);
+    if (!building) return;
+    
+    // Store current map and position for return
+    this.gameState.previousMap = {
+      map: this.gameState.currentMap,
+      position: { ...this.gameState.player.position }
+    };
+    
+    // Switch to building interior
+    this.gameState.currentMap = building.interiorMap;
+    this.gameState.player.position = { ...building.exitPosition };
+    
+    // Clear caches for new map
+    this.visibleTileCache = {};
+    this.lastCameraPosition = { x: -1, y: -1 };
+    
+    // Force discovery of all interior tiles since it's a small enclosed space
+    for (let y = 0; y < this.gameState.currentMap.tiles.length; y++) {
+      for (let x = 0; x < this.gameState.currentMap.tiles[y].length; x++) {
+        this.gameState.currentMap.tiles[y][x].discovered = true;
+        this.gameState.currentMap.tiles[y][x].visible = true;
+      }
+    }
+    
+    this.updateCamera();
+    this.updateVisibility();
+    this.notifyStateChange();
+  }
+  
+  private exitBuilding() {
+    if (!this.gameState.previousMap) return;
+    
+    // Return to previous map
+    this.gameState.currentMap = this.gameState.previousMap.map;
+    this.gameState.player.position = { ...this.gameState.previousMap.position };
+    this.gameState.previousMap = undefined;
+    
+    // Clear caches for map change
+    this.visibleTileCache = {};
+    this.lastCameraPosition = { x: -1, y: -1 };
+    
+    this.updateCamera();
+    this.updateVisibility();
+    this.notifyStateChange();
+  }
+  private renderSimpleUI() {
+    // Batch UI rendering
+    this.ctx.save();
+    
+    const healthPercent = this.gameState.player.health / this.gameState.player.maxHealth;
+    this.ctx.fillStyle = '#333333';
+    this.ctx.fillRect(10, 10, 150, 15);
+    this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
+    this.ctx.fillRect(10, 10, 150 * healthPercent, 15);
+    
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = '12px Arial';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`HP: ${this.gameState.player.health}/${this.gameState.player.maxHealth}`, 15, 22);
+    this.ctx.fillText(`Level: ${this.gameState.player.level}`, 15, 40);
+    
+    this.ctx.restore();
+  }
+
+  private renderTiles() {
+    // Ensure we have valid render bounds
+    const actualMapHeight = this.gameState.currentMap.tiles.length;
+    const actualMapWidth = this.gameState.currentMap.tiles[0]?.length || 0;
+    
+    // For interior maps, render all tiles regardless of discovery
+    const isInterior = this.gameState.currentMap.isInterior;
+    
+    // Clamp render bounds to actual map size
+    const startY = Math.max(0, Math.min(this.renderBounds.startY, actualMapHeight - 1));
+    const endY = Math.min(this.renderBounds.endY, actualMapHeight);
+    const startX = Math.max(0, Math.min(this.renderBounds.startX, actualMapWidth - 1));
+    const endX = Math.min(this.renderBounds.endX, actualMapWidth);
+    
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        // Ensure we don't access out-of-bounds tiles
+        if (!this.gameState.currentMap.tiles[y] || !this.gameState.currentMap.tiles[y][x]) {
+          continue;
+        }
+        
+        const tile = this.gameState.currentMap.tiles[y][x];
+        
+        // For interior maps, always render tiles. For exterior maps, check discovery
+        if (!isInterior && !tile.discovered) continue;
+
+        const screenX = x * 32 - this.gameState.camera.x;
+        const screenY = y * 32 - this.gameState.camera.y;
+
+        let color = this.getTileColor(tile.type);
+        
+        // For interior maps, don't darken tiles. For exterior maps, darken non-visible tiles
+        if (!isInterior && !tile.visible) {
+          color = this.darkenColor(color, 0.5);
+        }
+
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(screenX, screenY, 32, 32);
+
+        // Only draw borders in high quality mode
+        if (!this.isLowPerformanceDevice && !isInterior) {
+          this.ctx.strokeStyle = this.darkenColor(color, 0.8);
+          this.ctx.lineWidth = 1;
+          this.ctx.strokeRect(screenX, screenY, 32, 32);
+        }
+        
+        // For interior maps, draw clear borders to show room structure
+        if (isInterior && !this.isLowPerformanceDevice) {
+          this.ctx.strokeStyle = '#000000';
+          this.ctx.lineWidth = 1;
+          this.ctx.strokeRect(screenX, screenY, 32, 32);
+        }
+        
+        // Render entrance indicator for enterable buildings
+        if (!isInterior && tile.isEnterable && tile.visible && !this.isLowPerformanceDevice) {
+          this.ctx.fillStyle = '#ffff00';
+          this.ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
+          this.ctx.fillStyle = '#000000';
+          this.ctx.font = '14px Arial';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('E', screenX + 16, screenY + 20);
+        }
+      }
+    }
+  }
+
+  private getTileColor(type: string): string {
+    switch (type) {
+      case 'grass': return '#4a7c59';
+      case 'dirt': return '#8b4513';
+      case 'stone': return '#696969';
+      case 'water': return '#4682b4';
+      case 'lava': return '#ff4500';
+      case 'ice': return '#b0e0e6';
+      case 'sand': return '#f4a460';
+      case 'ruins': return '#2f2f2f';
+      case 'building': return '#654321';
+      default: return '#333333';
+    }
+  }
+
+  private darkenColor(color: string, factor: number): string {
+    const hex = color.replace('#', '');
+    const r = Math.floor(parseInt(hex.substr(0, 2), 16) * factor);
+    const g = Math.floor(parseInt(hex.substr(2, 2), 16) * factor);
+    const b = Math.floor(parseInt(hex.substr(4, 2), 16) * factor);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  private renderPlayer() {
+    const screenX = this.gameState.player.position.x - this.gameState.camera.x;
+    const screenY = this.gameState.player.position.y - this.gameState.camera.y;
+
+    this.ctx.fillStyle = '#4a90e2';
+    this.ctx.fillRect(screenX - 12, screenY - 12, 24, 24);
+    
+    this.ctx.fillStyle = '#ffffff';
+    switch (this.gameState.player.direction) {
+      case 'up':
+        this.ctx.fillRect(screenX - 4, screenY - 12, 8, 4);
+        break;
+      case 'down':
+        this.ctx.fillRect(screenX - 4, screenY + 8, 8, 4);
+        break;
+      case 'left':
+        this.ctx.fillRect(screenX - 12, screenY - 4, 4, 8);
+        break;
+      case 'right':
+        this.ctx.fillRect(screenX + 8, screenY - 4, 4, 8);
+        break;
+    }
+
+    if (!this.isLowPerformanceDevice) {
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = '12px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText(this.gameState.player.name, screenX, screenY - 20);
+    }
+  }
+
+  private renderNPCs() {
+    this.gameState.currentMap.npcs.forEach(npc => {
+      const screenX = npc.position.x - this.gameState.camera.x;
+      const screenY = npc.position.y - this.gameState.camera.y;
+
+      if (screenX < -32 || screenX > this.canvas.width + 32 || 
+          screenY < -32 || screenY > this.canvas.height + 32) return;
+
+      const tileX = Math.floor(npc.position.x / 32);
+      const tileY = Math.floor(npc.position.y / 32);
+      if (!this.gameState.currentMap.tiles[tileY]?.[tileX]?.discovered) return;
+
+      this.ctx.fillStyle = npc.isHostile ? '#ff4444' : '#44ff44';
+      this.ctx.fillRect(screenX - 10, screenY - 10, 20, 20);
+
+      if (!this.isLowPerformanceDevice) {
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '10px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(npc.name, screenX, screenY - 15);
+      }
+    });
+  }
+
+  private renderEnemies() {
+    this.gameState.currentMap.enemies.forEach(enemy => {
+      const screenX = enemy.position.x - this.gameState.camera.x;
+      const screenY = enemy.position.y - this.gameState.camera.y;
+
+      if (screenX < -32 || screenX > this.canvas.width + 32 || 
+          screenY < -32 || screenY > this.canvas.height + 32) return;
+
+      const tileX = Math.floor(enemy.position.x / 32);
+      const tileY = Math.floor(enemy.position.y / 32);
+      if (!this.gameState.currentMap.tiles[tileY]?.[tileX]?.discovered) return;
+
+      this.ctx.fillStyle = '#ff0000';
+      this.ctx.fillRect(screenX - 10, screenY - 10, 20, 20);
+
+      if (!this.isLowPerformanceDevice) {
+        const healthPercent = enemy.health / enemy.maxHealth;
+        this.ctx.fillStyle = '#333333';
+        this.ctx.fillRect(screenX - 12, screenY - 18, 24, 4);
+        this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
+        this.ctx.fillRect(screenX - 12, screenY - 18, 24 * healthPercent, 4);
+
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '10px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(enemy.name, screenX, screenY + 25);
+      }
+    });
+  }
+
+  private renderLootables() {
+    this.gameState.currentMap.lootables.forEach(lootable => {
+      if (lootable.looted) return;
+
+      const screenX = lootable.position.x - this.gameState.camera.x;
+      const screenY = lootable.position.y - this.gameState.camera.y;
+
+      if (screenX < -32 || screenX > this.canvas.width + 32 || 
+          screenY < -32 || screenY > this.canvas.height + 32) return;
+
+      const tileX = Math.floor(lootable.position.x / 32);
+      const tileY = Math.floor(lootable.position.y / 32);
+      if (!this.gameState.currentMap.tiles[tileY]?.[tileX]?.discovered) return;
+
+      this.ctx.fillStyle = '#ffaa00';
+      this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+      
+      if (!this.isLowPerformanceDevice) {
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('?', screenX, screenY + 4);
+      }
+    });
+  }
+
+  private renderUI() {
+    const healthPercent = this.gameState.player.health / this.gameState.player.maxHealth;
+    this.ctx.fillStyle = '#333333';
+    this.ctx.fillRect(10, 10, 200, 20);
+    this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
+    this.ctx.fillRect(10, 10, 200 * healthPercent, 20);
+    
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = '14px Arial';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`Health: ${this.gameState.player.health}/${this.gameState.player.maxHealth}`, 15, 25);
+
+    const energyPercent = this.gameState.player.energy / this.gameState.player.maxEnergy;
+    this.ctx.fillStyle = '#333333';
+    this.ctx.fillRect(10, 35, 200, 20);
+    this.ctx.fillStyle = '#0088ff';
+    this.ctx.fillRect(10, 35, 200 * energyPercent, 20);
+    this.ctx.fillText(`Energy: ${Math.floor(this.gameState.player.energy)}/${this.gameState.player.maxEnergy}`, 15, 50);
+
+    this.ctx.fillText(`Level: ${this.gameState.player.level}`, 15, 75);
+    this.ctx.fillText(`XP: ${this.gameState.player.experience}/${this.gameState.player.experienceToNext}`, 15, 90);
+    this.ctx.fillText(`Location: ${this.gameState.currentMap.name}`, 15, 110);
+    
+    // Show exit hint for interiors
+    if (this.gameState.currentMap.isInterior && this.gameState.previousMap) {
+      this.ctx.fillStyle = '#ffff00';
+      this.ctx.font = '12px Arial';
+      this.ctx.fillText('Press ESC to exit building', 15, 130);
+    }
+
+    // Only render mini-map on high performance devices
+    if (!this.isLowPerformanceDevice) {
+      this.renderMiniMap();
+    }
+  }
+
+  private renderMiniMap() {
+    // Skip minimap on low performance devices
+    if (this.isLowPerformanceDevice) return;
+    
+    const miniMapSize = 120;
+    const miniMapX = this.canvas.width - miniMapSize - 10;
+    const miniMapY = 10;
+    
+    this.ctx.fillStyle = '#000000';
+    this.ctx.fillRect(miniMapX, miniMapY, miniMapSize, miniMapSize);
+    this.ctx.strokeStyle = '#ffffff';
+    this.ctx.strokeRect(miniMapX, miniMapY, miniMapSize, miniMapSize);
+    
+    const scaleX = miniMapSize / this.gameState.currentMap.width;
+    const scaleY = miniMapSize / this.gameState.currentMap.height;
+    
+    // Increase sample rate for better performance
+    const sampleRate = 6;
+    
+    for (let y = 0; y < this.gameState.currentMap.height; y += sampleRate) {
+      for (let x = 0; x < this.gameState.currentMap.width; x += sampleRate) {
+        if (!this.gameState.currentMap.tiles[y] || !this.gameState.currentMap.tiles[y][x]) continue;
+        const tile = this.gameState.currentMap.tiles[y][x];
+        if (!tile.discovered) continue;
+        
+        const pixelX = miniMapX + x * scaleX;
+        const pixelY = miniMapY + y * scaleY;
+        
+        this.ctx.fillStyle = tile.visible ? '#888888' : '#444444';
+        this.ctx.fillRect(pixelX, pixelY, Math.max(1, scaleX * sampleRate), Math.max(1, scaleY * sampleRate));
+      }
+    }
+    
+    const playerX = miniMapX + (this.gameState.player.position.x / 32) * scaleX;
+    const playerY = miniMapY + (this.gameState.player.position.y / 32) * scaleY;
+    this.ctx.fillStyle = '#ff0000';
+    this.ctx.fillRect(playerX - 1, playerY - 1, 3, 3);
+  }
+
+  public setStateChangeCallback(callback: (newState: GameState) => void) {
+    this.stateChangeCallback = callback;
+  }
+
+  public setLootableCallback(callback: (lootable: any) => void) {
+    this.lootableCallback = callback;
+  }
+
+  private notifyStateChange() {
+    if (this.stateChangeCallback) {
+      this.stateChangeCallback({ ...this.gameState });
+    }
+  }
+
+  public setGameState(newState: GameState) {
+    this.gameState = { ...newState };
+  }
+
+  public getGameState(): GameState {
+    return { ...this.gameState };
+  }
+
+  public handleCombatAction(action: string, targetIndex?: number) {
+    console.log('Combat action:', action, targetIndex);
+  }
+
+  public destroy() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+    }
+  }
+}
