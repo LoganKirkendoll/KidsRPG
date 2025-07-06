@@ -198,6 +198,23 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNewGame, onLoadGame, onSettings, 
                 </div>
                 
                 <div className="flex items-center justify-between">
+                  <span>Auto-detect Performance</span>
+                  <button
+                    onClick={() => onUpdateSettings && onUpdateSettings({
+                      ...settings,
+                      autoDetectPerformance: !settings?.autoDetectPerformance
+                    })}
+                    className={`w-12 h-6 rounded-full transition-colors ${
+                      settings?.autoDetectPerformance !== false ? 'bg-green-600' : 'bg-gray-600'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                      settings?.autoDetectPerformance !== false ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+                
+                <div className="flex items-center justify-between">
                   <span>Graphics Quality</span>
                   <select
                     value={settings?.graphics || 'high'}

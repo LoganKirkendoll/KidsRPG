@@ -122,6 +122,7 @@ export class SaveSystem {
       sfxVolume: 0.8,
       graphics: 'high',
       lowGraphicsMode: false,
+      autoDetectPerformance: true,
       fullscreen: false,
       showFPS: true,
       autoSave: true,

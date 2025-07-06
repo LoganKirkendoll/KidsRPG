@@ -327,6 +327,7 @@ export interface GameSettings {
   sfxVolume: number;
   graphics: 'low' | 'medium' | 'high' | 'ultra';
   lowGraphicsMode: boolean;
+  autoDetectPerformance?: boolean;
   fullscreen: boolean;
   showFPS: boolean;
   autoSave: boolean;
