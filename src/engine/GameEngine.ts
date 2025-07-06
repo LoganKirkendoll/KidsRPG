@@ -499,8 +499,11 @@ export class GameEngine {
     this.gameState.camera.x = this.gameState.player.position.x - centerX;
     this.gameState.camera.y = this.gameState.player.position.y - centerY;
     
-    const mapWidth = this.gameState.currentMap.width * 32;
-    const mapHeight = this.gameState.currentMap.height * 32;
+    // Use actual tile array dimensions instead of declared map dimensions
+    const actualMapHeight = this.gameState.currentMap.tiles.length;
+    const actualMapWidth = this.gameState.currentMap.tiles[0]?.length || 0;
+    const mapWidth = actualMapWidth * 32;
+    const mapHeight = actualMapHeight * 32;
     
     this.gameState.camera.x = Math.max(0, Math.min(this.gameState.camera.x, mapWidth - this.canvas.width));
     this.gameState.camera.y = Math.max(0, Math.min(this.gameState.camera.y, mapHeight - this.canvas.height));
@@ -511,8 +514,8 @@ export class GameEngine {
       
       this.renderBounds.startX = Math.max(0, Math.floor(this.gameState.camera.x / 32) - 1);
       this.renderBounds.startY = Math.max(0, Math.floor(this.gameState.camera.y / 32) - 1);
-      this.renderBounds.endX = Math.min(this.renderBounds.startX + Math.ceil(this.canvas.width / 32) + 3, this.gameState.currentMap.width);
-      this.renderBounds.endY = Math.min(this.renderBounds.startY + Math.ceil(this.canvas.height / 32) + 3, this.gameState.currentMap.height);
+      this.renderBounds.endX = Math.min(this.renderBounds.startX + Math.ceil(this.canvas.width / 32) + 3, actualMapWidth);
+      this.renderBounds.endY = Math.min(this.renderBounds.startY + Math.ceil(this.canvas.height / 32) + 3, actualMapHeight);
       
       this.lastCameraPosition = { ...this.gameState.camera };
     }
@@ -523,16 +526,21 @@ export class GameEngine {
     const playerTileY = Math.floor(this.gameState.player.position.y / 32);
     const visionRange = 8;
     
-    if (!this.gameState.visibilityMap || this.gameState.visibilityMap.length !== this.gameState.currentMap.height) {
-      this.gameState.visibilityMap = Array(this.gameState.currentMap.height)
+    const actualMapHeight = this.gameState.currentMap.tiles.length;
+    const actualMapWidth = this.gameState.currentMap.tiles[0]?.length || 0;
+    
+    if (!this.gameState.visibilityMap || this.gameState.visibilityMap.length !== actualMapHeight) {
+      this.gameState.visibilityMap = Array(actualMapHeight)
         .fill(null)
-        .map(() => Array(this.gameState.currentMap.width).fill(false));
+        .map(() => Array(actualMapWidth).fill(false));
     }
     
     // Only update visibility for tiles in render bounds
     for (let y = this.renderBounds.startY; y < this.renderBounds.endY; y++) {
       for (let x = this.renderBounds.startX; x < this.renderBounds.endX; x++) {
-        this.gameState.currentMap.tiles[y][x].visible = false;
+        if (y >= 0 && y < actualMapHeight && x >= 0 && x < actualMapWidth) {
+          this.gameState.currentMap.tiles[y][x].visible = false;
+        }
       }
     }
     
@@ -544,11 +552,13 @@ export class GameEngine {
     
     for (let y = minY; y < maxY; y++) {
       for (let x = minX; x < maxX; x++) {
-        const distance = Math.sqrt(Math.pow(x - playerTileX, 2) + Math.pow(y - playerTileY, 2));
-        if (distance <= visionRange) {
-          this.gameState.currentMap.tiles[y][x].visible = true;
-          this.gameState.currentMap.tiles[y][x].discovered = true;
-          this.gameState.visibilityMap[y][x] = true;
+        if (y >= 0 && y < actualMapHeight && x >= 0 && x < actualMapWidth) {
+          const distance = Math.sqrt(Math.pow(x - playerTileX, 2) + Math.pow(y - playerTileY, 2));
+          if (distance <= visionRange) {
+            this.gameState.currentMap.tiles[y][x].visible = true;
+            this.gameState.currentMap.tiles[y][x].discovered = true;
+            this.gameState.visibilityMap[y][x] = true;
+          }
         }
       }
     }
