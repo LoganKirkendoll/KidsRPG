@@ -17,6 +17,17 @@ export class GameEngine {
   private edgeTimer = 0;
   private isAtEdge = false;
   private edgeDirection: 'north' | 'south' | 'east' | 'west' | null = null;
+  
+  // Performance optimization properties
+  private frameCount = 0;
+  private lastFpsTime = 0;
+  private targetFps = 60;
+  private frameInterval = 1000 / this.targetFps;
+  private lastRenderTime = 0;
+  private visibleTileCache: { [key: string]: boolean } = {};
+  private lastCameraPosition = { x: -1, y: -1 };
+  private renderBounds = { startX: 0, startY: 0, endX: 0, endY: 0 };
+  private isLowPerformanceDevice = false;
 
   constructor(canvas: HTMLCanvasElement, initialGameState: GameState, settings?: any) {
     this.canvas = canvas;
@@ -27,11 +38,34 @@ export class GameEngine {
     this.canvas.width = 800;
     this.canvas.height = 600;
     
+    // Detect low performance devices
+    this.detectPerformance();
+    
     // Load only current map initially
     this.loadedMaps[this.gameState.currentMap.id] = this.gameState.currentMap;
     
     this.setupEventListeners();
     this.gameLoop(0);
+  }
+
+  private detectPerformance() {
+    // Simple performance detection based on user agent and hardware
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+    const isOldBrowser = !window.requestAnimationFrame || !window.performance;
+    
+    // Check for hardware acceleration
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    const hasWebGL = !!gl;
+    
+    this.isLowPerformanceDevice = isMobile || isOldBrowser || !hasWebGL;
+    
+    if (this.isLowPerformanceDevice) {
+      this.targetFps = 30; // Lower FPS for low-end devices
+      this.frameInterval = 1000 / this.targetFps;
+      this.settings.lowGraphicsMode = true;
+    }
   }
 
   private setupEventListeners() {
@@ -52,6 +86,29 @@ export class GameEngine {
         e.preventDefault();
       }
     });
+
+    // Handle visibility change to pause/resume game
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.pauseGame();
+      } else {
+        this.resumeGame();
+      }
+    });
+  }
+
+  private pauseGame() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+  }
+
+  private resumeGame() {
+    if (!this.animationId) {
+      this.lastTime = performance.now();
+      this.gameLoop(this.lastTime);
+    }
   }
 
   private handleKeyPress(key: string) {
@@ -136,7 +193,6 @@ export class GameEngine {
         Math.pow(lootable.position.y - playerPos.y, 2)
       );
       if (distance <= interactionRange) {
-        // Mark as looted and remove from map when interacted with
         lootable.looted = true;
         return true;
       }
@@ -146,7 +202,6 @@ export class GameEngine {
     if (nearbyLootable && this.lootableCallback) {
       this.lootableCallback(nearbyLootable);
       
-      // Remove looted item from map after a short delay
       setTimeout(() => {
         const lootIndex = this.gameState.currentMap.lootables.findIndex(l => l.id === nearbyLootable.id);
         if (lootIndex >= 0) {
@@ -200,21 +255,19 @@ export class GameEngine {
 
   private updatePlayerMovement(deltaTime: number) {
     if (this.gameState.gameMode !== 'exploration') return;
-    if (this.isTransitioning) return; // Prevent movement during transitions
+    if (this.isTransitioning) return;
 
-    // Update transition cooldown
     if (this.transitionCooldown > 0) {
       this.transitionCooldown -= deltaTime;
     }
 
-    const speed = 128; // pixels per second
+    const speed = 128;
     const moveDistance = speed * (deltaTime / 1000);
     
     let newX = this.gameState.player.position.x;
     let newY = this.gameState.player.position.y;
     let moved = false;
 
-    // Handle movement
     if (this.keys['w'] || this.keys['arrowup']) {
       newY -= moveDistance;
       this.gameState.player.direction = 'up';
@@ -237,15 +290,12 @@ export class GameEngine {
     }
 
     if (moved) {
-      // Check map boundaries and handle transitions
       const mapWidth = this.gameState.currentMap.width * 32;
       const mapHeight = this.gameState.currentMap.height * 32;
       
-      // Check if player is at edge
       const atEdge = newX < 16 || newX >= mapWidth - 16 || newY < 16 || newY >= mapHeight - 16;
       
       if (atEdge && this.transitionCooldown <= 0) {
-        // Determine which edge
         let currentEdgeDirection: 'north' | 'south' | 'east' | 'west' | null = null;
         if (newX < 16) currentEdgeDirection = 'west';
         else if (newX >= mapWidth - 16) currentEdgeDirection = 'east';
@@ -253,28 +303,23 @@ export class GameEngine {
         else if (newY >= mapHeight - 16) currentEdgeDirection = 'south';
         
         if (!this.isAtEdge || this.edgeDirection !== currentEdgeDirection) {
-          // Just reached edge or changed direction
           this.isAtEdge = true;
           this.edgeDirection = currentEdgeDirection;
           this.edgeTimer = 0;
         } else {
-          // Continue at edge, increment timer
           this.edgeTimer += deltaTime;
           
-          // After 2 seconds at edge, trigger transition
           if (this.edgeTimer >= 2000) {
             this.handleMapTransition(newX, newY, mapWidth, mapHeight);
             return;
           }
         }
       } else {
-        // Not at edge, reset timer
         this.isAtEdge = false;
         this.edgeDirection = null;
         this.edgeTimer = 0;
       }
 
-      // Check collision with tiles
       const tileX = Math.floor(newX / 32);
       const tileY = Math.floor(newY / 32);
       
@@ -283,13 +328,9 @@ export class GameEngine {
         this.gameState.player.position.y = newY;
         this.gameState.player.isMoving = true;
         
-        // Update camera to follow player
         this.updateCamera();
-        
-        // Update visibility
         this.updateVisibility();
         
-        // Update statistics
         this.gameState.statistics.distanceTraveled += moveDistance;
       }
     } else {
@@ -298,19 +339,17 @@ export class GameEngine {
   }
 
   private handleMapTransition(newX: number, newY: number, mapWidth: number, mapHeight: number) {
-    if (this.isTransitioning || this.transitionCooldown > 0) return; // Prevent multiple transitions
+    if (this.isTransitioning || this.transitionCooldown > 0) return;
     
-    // Reset edge timer
     this.isAtEdge = false;
     this.edgeDirection = null;
     this.edgeTimer = 0;
     
     this.isTransitioning = true;
-    this.transitionCooldown = 1000; // 1 second cooldown
+    this.transitionCooldown = 1000;
     
     let direction: 'north' | 'south' | 'east' | 'west' | null = null;
     
-    // Determine direction based on player position
     if (newX < 16) direction = 'west';
     else if (newX >= mapWidth - 16) direction = 'east';
     else if (newY < 16) direction = 'north';
@@ -321,17 +360,14 @@ export class GameEngine {
       return;
     }
     
-    // Find connection for this direction
     const connection = this.gameState.currentMap.connections.find(conn => conn.direction === direction);
     if (!connection) {
       this.isTransitioning = false;
       return;
     }
     
-    // Load target map if not already loaded
     let targetMap = this.loadedMaps[connection.targetMapId];
     if (!targetMap) {
-      // Create the map on demand
       const createMapFn = maps[connection.targetMapId as keyof typeof maps];
       if (createMapFn) {
         targetMap = createMapFn();
@@ -342,9 +378,8 @@ export class GameEngine {
       }
     }
     
-    // Calculate proper target position based on direction with safe margins
     let targetPosition: Position;
-    const safeMargin = 64; // 2 tiles from edge
+    const safeMargin = 64;
     
     switch (direction) {
       case 'north':
@@ -376,23 +411,18 @@ export class GameEngine {
         return;
     }
     
-    // Switch to new map
     this.gameState.currentMap = targetMap;
-    
-    // Set player position with proper offset from edge
     this.gameState.player.position = { ...targetPosition };
     
-    // Ensure player is on a walkable tile
     const tileX = Math.floor(this.gameState.player.position.x / 32);
     const tileY = Math.floor(this.gameState.player.position.y / 32);
     
     if (!this.isValidPosition(tileX, tileY)) {
-      // Find nearest walkable tile in a spiral pattern
       let found = false;
       for (let radius = 1; radius <= 10 && !found; radius++) {
         for (let dy = -radius; dy <= radius && !found; dy++) {
           for (let dx = -radius; dx <= radius && !found; dx++) {
-            if (Math.abs(dx) === radius || Math.abs(dy) === radius) { // Only check perimeter
+            if (Math.abs(dx) === radius || Math.abs(dy) === radius) {
               const checkX = tileX + dx;
               const checkY = tileY + dy;
               if (this.isValidPosition(checkX, checkY)) {
@@ -406,14 +436,14 @@ export class GameEngine {
       }
     }
     
-    // Update camera and visibility
+    // Clear caches for new map
+    this.visibleTileCache = {};
+    this.lastCameraPosition = { x: -1, y: -1 };
+    
     this.updateCamera();
     this.updateVisibility();
-    
-    // Notify state change
     this.notifyStateChange();
     
-    // Reset transition flag after delay
     setTimeout(() => {
       this.isTransitioning = false;
     }, 500);
@@ -437,12 +467,23 @@ export class GameEngine {
     this.gameState.camera.x = this.gameState.player.position.x - centerX;
     this.gameState.camera.y = this.gameState.player.position.y - centerY;
     
-    // Clamp camera to map bounds
     const mapWidth = this.gameState.currentMap.width * 32;
     const mapHeight = this.gameState.currentMap.height * 32;
     
     this.gameState.camera.x = Math.max(0, Math.min(this.gameState.camera.x, mapWidth - this.canvas.width));
     this.gameState.camera.y = Math.max(0, Math.min(this.gameState.camera.y, mapHeight - this.canvas.height));
+
+    // Update render bounds only if camera moved significantly
+    if (Math.abs(this.gameState.camera.x - this.lastCameraPosition.x) > 16 || 
+        Math.abs(this.gameState.camera.y - this.lastCameraPosition.y) > 16) {
+      
+      this.renderBounds.startX = Math.max(0, Math.floor(this.gameState.camera.x / 32) - 1);
+      this.renderBounds.startY = Math.max(0, Math.floor(this.gameState.camera.y / 32) - 1);
+      this.renderBounds.endX = Math.min(this.renderBounds.startX + Math.ceil(this.canvas.width / 32) + 3, this.gameState.currentMap.width);
+      this.renderBounds.endY = Math.min(this.renderBounds.startY + Math.ceil(this.canvas.height / 32) + 3, this.gameState.currentMap.height);
+      
+      this.lastCameraPosition = { ...this.gameState.camera };
+    }
   }
 
   private updateVisibility() {
@@ -450,27 +491,27 @@ export class GameEngine {
     const playerTileY = Math.floor(this.gameState.player.position.y / 32);
     const visionRange = 8;
     
-    // Initialize visibility map if needed
     if (!this.gameState.visibilityMap || this.gameState.visibilityMap.length !== this.gameState.currentMap.height) {
       this.gameState.visibilityMap = Array(this.gameState.currentMap.height)
         .fill(null)
         .map(() => Array(this.gameState.currentMap.width).fill(false));
     }
     
-    // Clear current visibility
-    for (let y = 0; y < this.gameState.currentMap.height; y++) {
-      for (let x = 0; x < this.gameState.currentMap.width; x++) {
+    // Only update visibility for tiles in render bounds
+    for (let y = this.renderBounds.startY; y < this.renderBounds.endY; y++) {
+      for (let x = this.renderBounds.startX; x < this.renderBounds.endX; x++) {
         this.gameState.currentMap.tiles[y][x].visible = false;
       }
     }
     
     // Set visibility around player
-    for (let y = Math.max(0, playerTileY - visionRange); 
-         y < Math.min(this.gameState.currentMap.height, playerTileY + visionRange + 1); 
-         y++) {
-      for (let x = Math.max(0, playerTileX - visionRange); 
-           x < Math.min(this.gameState.currentMap.width, playerTileX + visionRange + 1); 
-           x++) {
+    const minY = Math.max(this.renderBounds.startY, playerTileY - visionRange);
+    const maxY = Math.min(this.renderBounds.endY, playerTileY + visionRange + 1);
+    const minX = Math.max(this.renderBounds.startX, playerTileX - visionRange);
+    const maxX = Math.min(this.renderBounds.endX, playerTileX + visionRange + 1);
+    
+    for (let y = minY; y < maxY; y++) {
+      for (let x = minX; x < maxX; x++) {
         const distance = Math.sqrt(Math.pow(x - playerTileX, 2) + Math.pow(y - playerTileY, 2));
         if (distance <= visionRange) {
           this.gameState.currentMap.tiles[y][x].visible = true;
@@ -482,15 +523,22 @@ export class GameEngine {
   }
 
   private gameLoop(currentTime: number) {
+    // Frame rate limiting
     const deltaTime = currentTime - this.lastTime;
-    this.lastTime = currentTime;
+    
+    if (deltaTime >= this.frameInterval) {
+      this.lastTime = currentTime - (deltaTime % this.frameInterval);
+      
+      // Update game logic
+      this.updatePlayerMovement(deltaTime);
+      this.updateGameTime(deltaTime);
 
-    // Update game logic
-    this.updatePlayerMovement(deltaTime);
-    this.updateGameTime(deltaTime);
-
-    // Render
-    this.render();
+      // Only render if enough time has passed
+      if (currentTime - this.lastRenderTime >= this.frameInterval) {
+        this.render();
+        this.lastRenderTime = currentTime;
+      }
+    }
 
     // Continue loop
     this.animationId = requestAnimationFrame((time) => this.gameLoop(time));
@@ -500,8 +548,7 @@ export class GameEngine {
     this.gameState.gameTime += deltaTime / 1000;
     this.gameState.statistics.playtime += deltaTime / 1000;
     
-    // Update day/night cycle (24 minutes = 1 day)
-    const dayLength = 24 * 60; // 24 minutes in seconds
+    const dayLength = 24 * 60;
     this.gameState.dayNightCycle = (this.gameState.gameTime % dayLength) / dayLength;
   }
 
@@ -510,50 +557,38 @@ export class GameEngine {
     this.ctx.fillStyle = '#1a1a1a';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    if (this.settings.lowGraphicsMode) {
+    if (this.settings.lowGraphicsMode || this.isLowPerformanceDevice) {
       this.renderLowGraphics();
     } else {
-      // Render tiles
       this.renderTiles();
-      
-      // Render entities
       this.renderNPCs();
       this.renderEnemies();
       this.renderLootables();
-      
-      // Render player
       this.renderPlayer();
-      
-      // Render UI
       this.renderUI();
     }
     
-    // Render edge timer if at edge
     if (this.isAtEdge && this.edgeTimer > 0) {
       this.renderEdgeTimer();
     }
   }
   
   private renderEdgeTimer() {
-    const progress = this.edgeTimer / 2000; // 2 seconds
+    const progress = this.edgeTimer / 2000;
     const barWidth = 200;
     const barHeight = 20;
     const x = (this.canvas.width - barWidth) / 2;
     const y = 50;
     
-    // Background
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     this.ctx.fillRect(x - 10, y - 10, barWidth + 20, barHeight + 20);
     
-    // Progress bar background
     this.ctx.fillStyle = '#333333';
     this.ctx.fillRect(x, y, barWidth, barHeight);
     
-    // Progress bar fill
     this.ctx.fillStyle = '#ffaa00';
     this.ctx.fillRect(x, y, barWidth * progress, barHeight);
     
-    // Text
     this.ctx.fillStyle = '#ffffff';
     this.ctx.font = '14px Arial';
     this.ctx.textAlign = 'center';
@@ -565,22 +600,15 @@ export class GameEngine {
   }
   
   private renderLowGraphics() {
-    // Simplified rendering for low-end devices
-    const startX = Math.floor(this.gameState.camera.x / 32);
-    const startY = Math.floor(this.gameState.camera.y / 32);
-    const endX = Math.min(startX + Math.ceil(this.canvas.width / 32) + 1, this.gameState.currentMap.width);
-    const endY = Math.min(startY + Math.ceil(this.canvas.height / 32) + 1, this.gameState.currentMap.height);
-
-    // Render only visible tiles with simple colors
-    for (let y = Math.max(0, startY); y < endY; y++) {
-      for (let x = Math.max(0, startX); x < endX; x++) {
+    // Only render visible tiles with simple colors
+    for (let y = this.renderBounds.startY; y < this.renderBounds.endY; y++) {
+      for (let x = this.renderBounds.startX; x < this.renderBounds.endX; x++) {
         const tile = this.gameState.currentMap.tiles[y][x];
         if (!tile.discovered) continue;
 
         const screenX = x * 32 - this.gameState.camera.x;
         const screenY = y * 32 - this.gameState.camera.y;
 
-        // Simple tile colors without borders
         let color = this.getTileColor(tile.type);
         if (!tile.visible) {
           color = this.darkenColor(color, 0.5);
@@ -591,7 +619,6 @@ export class GameEngine {
       }
     }
     
-    // Render only player and nearby entities
     this.renderPlayer();
     this.renderNearbyEntities();
     this.renderSimpleUI();
@@ -599,7 +626,7 @@ export class GameEngine {
   
   private renderNearbyEntities() {
     const playerPos = this.gameState.player.position;
-    const renderDistance = 200; // Only render entities within 200 pixels
+    const renderDistance = 200;
     
     // Render nearby NPCs
     this.gameState.currentMap.npcs.forEach(npc => {
@@ -635,7 +662,6 @@ export class GameEngine {
   }
   
   private renderSimpleUI() {
-    // Simplified UI for low graphics mode
     const healthPercent = this.gameState.player.health / this.gameState.player.maxHealth;
     this.ctx.fillStyle = '#333333';
     this.ctx.fillRect(10, 10, 150, 15);
@@ -650,23 +676,16 @@ export class GameEngine {
   }
 
   private renderTiles() {
-    const startX = Math.floor(this.gameState.camera.x / 32);
-    const startY = Math.floor(this.gameState.camera.y / 32);
-    const endX = Math.min(startX + Math.ceil(this.canvas.width / 32) + 1, this.gameState.currentMap.width);
-    const endY = Math.min(startY + Math.ceil(this.canvas.height / 32) + 1, this.gameState.currentMap.height);
-
-    for (let y = Math.max(0, startY); y < endY; y++) {
-      for (let x = Math.max(0, startX); x < endX; x++) {
+    for (let y = this.renderBounds.startY; y < this.renderBounds.endY; y++) {
+      for (let x = this.renderBounds.startX; x < this.renderBounds.endX; x++) {
         const tile = this.gameState.currentMap.tiles[y][x];
         if (!tile.discovered) continue;
 
         const screenX = x * 32 - this.gameState.camera.x;
         const screenY = y * 32 - this.gameState.camera.y;
 
-        // Get tile color based on type
         let color = this.getTileColor(tile.type);
         
-        // Darken if not visible
         if (!tile.visible) {
           color = this.darkenColor(color, 0.5);
         }
@@ -674,10 +693,12 @@ export class GameEngine {
         this.ctx.fillStyle = color;
         this.ctx.fillRect(screenX, screenY, 32, 32);
 
-        // Draw tile border
-        this.ctx.strokeStyle = this.darkenColor(color, 0.8);
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeRect(screenX, screenY, 32, 32);
+        // Only draw borders in high quality mode
+        if (!this.isLowPerformanceDevice) {
+          this.ctx.strokeStyle = this.darkenColor(color, 0.8);
+          this.ctx.lineWidth = 1;
+          this.ctx.strokeRect(screenX, screenY, 32, 32);
+        }
       }
     }
   }
@@ -709,11 +730,9 @@ export class GameEngine {
     const screenX = this.gameState.player.position.x - this.gameState.camera.x;
     const screenY = this.gameState.player.position.y - this.gameState.camera.y;
 
-    // Player body
     this.ctx.fillStyle = '#4a90e2';
     this.ctx.fillRect(screenX - 12, screenY - 12, 24, 24);
     
-    // Player direction indicator
     this.ctx.fillStyle = '#ffffff';
     switch (this.gameState.player.direction) {
       case 'up':
@@ -730,11 +749,12 @@ export class GameEngine {
         break;
     }
 
-    // Player name
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = '12px Arial';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(this.gameState.player.name, screenX, screenY - 20);
+    if (!this.isLowPerformanceDevice) {
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = '12px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText(this.gameState.player.name, screenX, screenY - 20);
+    }
   }
 
   private renderNPCs() {
@@ -742,7 +762,6 @@ export class GameEngine {
       const screenX = npc.position.x - this.gameState.camera.x;
       const screenY = npc.position.y - this.gameState.camera.y;
 
-      // Only render if on screen and in discovered area
       if (screenX < -32 || screenX > this.canvas.width + 32 || 
           screenY < -32 || screenY > this.canvas.height + 32) return;
 
@@ -750,15 +769,15 @@ export class GameEngine {
       const tileY = Math.floor(npc.position.y / 32);
       if (!this.gameState.currentMap.tiles[tileY]?.[tileX]?.discovered) return;
 
-      // NPC body
       this.ctx.fillStyle = npc.isHostile ? '#ff4444' : '#44ff44';
       this.ctx.fillRect(screenX - 10, screenY - 10, 20, 20);
 
-      // NPC name
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = '10px Arial';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText(npc.name, screenX, screenY - 15);
+      if (!this.isLowPerformanceDevice) {
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '10px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(npc.name, screenX, screenY - 15);
+      }
     });
   }
 
@@ -767,7 +786,6 @@ export class GameEngine {
       const screenX = enemy.position.x - this.gameState.camera.x;
       const screenY = enemy.position.y - this.gameState.camera.y;
 
-      // Only render if on screen and in discovered area
       if (screenX < -32 || screenX > this.canvas.width + 32 || 
           screenY < -32 || screenY > this.canvas.height + 32) return;
 
@@ -775,33 +793,31 @@ export class GameEngine {
       const tileY = Math.floor(enemy.position.y / 32);
       if (!this.gameState.currentMap.tiles[tileY]?.[tileX]?.discovered) return;
 
-      // Enemy body
       this.ctx.fillStyle = '#ff0000';
       this.ctx.fillRect(screenX - 10, screenY - 10, 20, 20);
 
-      // Health bar
-      const healthPercent = enemy.health / enemy.maxHealth;
-      this.ctx.fillStyle = '#333333';
-      this.ctx.fillRect(screenX - 12, screenY - 18, 24, 4);
-      this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
-      this.ctx.fillRect(screenX - 12, screenY - 18, 24 * healthPercent, 4);
+      if (!this.isLowPerformanceDevice) {
+        const healthPercent = enemy.health / enemy.maxHealth;
+        this.ctx.fillStyle = '#333333';
+        this.ctx.fillRect(screenX - 12, screenY - 18, 24, 4);
+        this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
+        this.ctx.fillRect(screenX - 12, screenY - 18, 24 * healthPercent, 4);
 
-      // Enemy name
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = '10px Arial';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText(enemy.name, screenX, screenY + 25);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '10px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(enemy.name, screenX, screenY + 25);
+      }
     });
   }
 
   private renderLootables() {
     this.gameState.currentMap.lootables.forEach(lootable => {
-      if (lootable.looted) return; // Don't render looted items
+      if (lootable.looted) return;
 
       const screenX = lootable.position.x - this.gameState.camera.x;
       const screenY = lootable.position.y - this.gameState.camera.y;
 
-      // Only render if on screen and in discovered area
       if (screenX < -32 || screenX > this.canvas.width + 32 || 
           screenY < -32 || screenY > this.canvas.height + 32) return;
 
@@ -809,20 +825,19 @@ export class GameEngine {
       const tileY = Math.floor(lootable.position.y / 32);
       if (!this.gameState.currentMap.tiles[tileY]?.[tileX]?.discovered) return;
 
-      // Lootable container
       this.ctx.fillStyle = '#ffaa00';
       this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
       
-      // Loot indicator
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = '12px Arial';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText('?', screenX, screenY + 4);
+      if (!this.isLowPerformanceDevice) {
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('?', screenX, screenY + 4);
+      }
     });
   }
 
   private renderUI() {
-    // Health bar
     const healthPercent = this.gameState.player.health / this.gameState.player.maxHealth;
     this.ctx.fillStyle = '#333333';
     this.ctx.fillRect(10, 10, 200, 20);
@@ -834,7 +849,6 @@ export class GameEngine {
     this.ctx.textAlign = 'left';
     this.ctx.fillText(`Health: ${this.gameState.player.health}/${this.gameState.player.maxHealth}`, 15, 25);
 
-    // Energy bar
     const energyPercent = this.gameState.player.energy / this.gameState.player.maxEnergy;
     this.ctx.fillStyle = '#333333';
     this.ctx.fillRect(10, 35, 200, 20);
@@ -842,15 +856,14 @@ export class GameEngine {
     this.ctx.fillRect(10, 35, 200 * energyPercent, 20);
     this.ctx.fillText(`Energy: ${Math.floor(this.gameState.player.energy)}/${this.gameState.player.maxEnergy}`, 15, 50);
 
-    // Level and XP
     this.ctx.fillText(`Level: ${this.gameState.player.level}`, 15, 75);
     this.ctx.fillText(`XP: ${this.gameState.player.experience}/${this.gameState.player.experienceToNext}`, 15, 90);
-
-    // Current map
     this.ctx.fillText(`Location: ${this.gameState.currentMap.name}`, 15, 110);
 
-    // Mini-map
-    this.renderMiniMap();
+    // Only render mini-map on high performance devices
+    if (!this.isLowPerformanceDevice) {
+      this.renderMiniMap();
+    }
   }
 
   private renderMiniMap() {
@@ -858,19 +871,19 @@ export class GameEngine {
     const miniMapX = this.canvas.width - miniMapSize - 10;
     const miniMapY = 10;
     
-    // Mini-map background
     this.ctx.fillStyle = '#000000';
     this.ctx.fillRect(miniMapX, miniMapY, miniMapSize, miniMapSize);
     this.ctx.strokeStyle = '#ffffff';
     this.ctx.strokeRect(miniMapX, miniMapY, miniMapSize, miniMapSize);
     
-    // Calculate scale
     const scaleX = miniMapSize / this.gameState.currentMap.width;
     const scaleY = miniMapSize / this.gameState.currentMap.height;
     
-    // Draw discovered tiles
-    for (let y = 0; y < this.gameState.currentMap.height; y++) {
-      for (let x = 0; x < this.gameState.currentMap.width; x++) {
+    // Sample tiles for performance (every 4th tile)
+    const sampleRate = this.isLowPerformanceDevice ? 8 : 4;
+    
+    for (let y = 0; y < this.gameState.currentMap.height; y += sampleRate) {
+      for (let x = 0; x < this.gameState.currentMap.width; x += sampleRate) {
         const tile = this.gameState.currentMap.tiles[y][x];
         if (!tile.discovered) continue;
         
@@ -878,11 +891,10 @@ export class GameEngine {
         const pixelY = miniMapY + y * scaleY;
         
         this.ctx.fillStyle = tile.visible ? '#888888' : '#444444';
-        this.ctx.fillRect(pixelX, pixelY, Math.max(1, scaleX), Math.max(1, scaleY));
+        this.ctx.fillRect(pixelX, pixelY, Math.max(1, scaleX * sampleRate), Math.max(1, scaleY * sampleRate));
       }
     }
     
-    // Draw player position
     const playerX = miniMapX + (this.gameState.player.position.x / 32) * scaleX;
     const playerY = miniMapY + (this.gameState.player.position.y / 32) * scaleY;
     this.ctx.fillStyle = '#ff0000';
@@ -912,7 +924,6 @@ export class GameEngine {
   }
 
   public handleCombatAction(action: string, targetIndex?: number) {
-    // Combat action handling would go here
     console.log('Combat action:', action, targetIndex);
   }
 
