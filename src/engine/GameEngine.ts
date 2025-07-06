@@ -1,4 +1,5 @@
 import { GameState, Position, Character, Enemy, NPC, Tile, GameMap } from '../types/game';
+import { maps } from '../data/maps';
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
@@ -276,7 +277,6 @@ export class GameEngine {
     let targetMap = this.loadedMaps[connection.targetMapId];
     if (!targetMap) {
       // Create the map on demand
-      const { maps } = require('../data/maps');
       const createMapFn = maps[connection.targetMapId];
       if (createMapFn) {
         targetMap = createMapFn();
