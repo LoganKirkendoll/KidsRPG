@@ -23,9 +23,8 @@ export const useGameState = () => {
   }, [gameState, settings.autoSave]);
 
   const updateGameState = useCallback((newState: GameState) => {
-    // Force a complete re-render by creating a new object reference
-    const updatedState = JSON.parse(JSON.stringify(newState));
-    setGameState(updatedState);
+    // Avoid deep cloning for performance - just update the reference
+    setGameState(newState);
   }, []);
 
   const createNewGame = useCallback((playerName: string, characterClass: any) => {

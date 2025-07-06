@@ -44,7 +44,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, settings, onGameStat
     if (engineRef.current) {
       engineRef.current.setGameState(gameState);
     }
-  }, [gameState]);
+  }, []); // Remove gameState dependency to prevent constant re-renders
 
   // Expose engine to parent component
   useEffect(() => {

@@ -59,7 +59,7 @@ function App() {
     if (gameState && gameState.player.health <= 0 && !showGameOver) {
       setShowGameOver(true);
     }
-  }, [gameState?.player.health, showGameOver]);
+  }, [gameState?.player.health]); // Remove showGameOver dependency
 
   const handleSettings = () => {
     // Settings modal would be implemented here

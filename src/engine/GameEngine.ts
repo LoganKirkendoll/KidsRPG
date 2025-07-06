@@ -29,6 +29,11 @@ export class GameEngine {
   private lastCameraPosition = { x: -1, y: -1 };
   private renderBounds = { startX: 0, startY: 0, endX: 0, endY: 0 };
   private isLowPerformanceDevice = false;
+  private tileRenderCache: ImageData | null = null;
+  private cacheInvalidated = true;
+  private lastPlayerPosition = { x: -1, y: -1 };
+  private renderSkipCounter = 0;
+  private maxRenderSkip = 2;
 
   constructor(canvas: HTMLCanvasElement, initialGameState: GameState, settings?: any) {
     this.canvas = canvas;
@@ -66,6 +71,7 @@ export class GameEngine {
       this.targetFps = 30; // Lower FPS for low-end devices
       this.frameInterval = 1000 / this.targetFps;
       this.settings.lowGraphicsMode = true;
+      this.maxRenderSkip = 3; // Skip more frames on low-end devices
     }
   }
 
@@ -293,7 +299,8 @@ export class GameEngine {
       this.transitionCooldown -= deltaTime;
     }
 
-    const speed = 128;
+    // Reduce movement speed slightly for smoother movement
+    const speed = this.isLowPerformanceDevice ? 96 : 112;
     const moveDistance = speed * (deltaTime / 1000);
     
     let newX = this.gameState.player.position.x;
@@ -360,8 +367,16 @@ export class GameEngine {
         this.gameState.player.position.y = newY;
         this.gameState.player.isMoving = true;
         
-        this.updateCamera();
-        this.updateVisibility();
+        // Only update camera and visibility if player moved significantly
+        const playerMoved = Math.abs(newX - this.lastPlayerPosition.x) > 8 || 
+                           Math.abs(newY - this.lastPlayerPosition.y) > 8;
+        
+        if (playerMoved) {
+          this.updateCamera();
+          this.updateVisibility();
+          this.lastPlayerPosition = { x: newX, y: newY };
+          this.cacheInvalidated = true;
+        }
         
         this.gameState.statistics.distanceTraveled += moveDistance;
       }
@@ -496,8 +511,8 @@ export class GameEngine {
     const centerX = this.canvas.width / 2;
     const centerY = this.canvas.height / 2;
     
-    this.gameState.camera.x = this.gameState.player.position.x - centerX;
-    this.gameState.camera.y = this.gameState.player.position.y - centerY;
+    const newCameraX = this.gameState.player.position.x - centerX;
+    const newCameraY = this.gameState.player.position.y - centerY;
     
     // Use actual tile array dimensions instead of declared map dimensions
     const actualMapHeight = this.gameState.currentMap.tiles.length;
@@ -505,26 +520,27 @@ export class GameEngine {
     const mapWidth = actualMapWidth * 32;
     const mapHeight = actualMapHeight * 32;
     
-    this.gameState.camera.x = Math.max(0, Math.min(this.gameState.camera.x, mapWidth - this.canvas.width));
-    this.gameState.camera.y = Math.max(0, Math.min(this.gameState.camera.y, mapHeight - this.canvas.height));
+    this.gameState.camera.x = Math.max(0, Math.min(newCameraX, mapWidth - this.canvas.width));
+    this.gameState.camera.y = Math.max(0, Math.min(newCameraY, mapHeight - this.canvas.height));
 
-    // Update render bounds only if camera moved significantly
-    if (Math.abs(this.gameState.camera.x - this.lastCameraPosition.x) > 16 || 
-        Math.abs(this.gameState.camera.y - this.lastCameraPosition.y) > 16) {
+    // Update render bounds only if camera moved significantly (increased threshold)
+    if (Math.abs(this.gameState.camera.x - this.lastCameraPosition.x) > 32 || 
+        Math.abs(this.gameState.camera.y - this.lastCameraPosition.y) > 32) {
       
       this.renderBounds.startX = Math.max(0, Math.floor(this.gameState.camera.x / 32) - 1);
       this.renderBounds.startY = Math.max(0, Math.floor(this.gameState.camera.y / 32) - 1);
-      this.renderBounds.endX = Math.min(this.renderBounds.startX + Math.ceil(this.canvas.width / 32) + 3, actualMapWidth);
-      this.renderBounds.endY = Math.min(this.renderBounds.startY + Math.ceil(this.canvas.height / 32) + 3, actualMapHeight);
+      this.renderBounds.endX = Math.min(this.renderBounds.startX + Math.ceil(this.canvas.width / 32) + 2, actualMapWidth);
+      this.renderBounds.endY = Math.min(this.renderBounds.startY + Math.ceil(this.canvas.height / 32) + 2, actualMapHeight);
       
       this.lastCameraPosition = { ...this.gameState.camera };
+      this.cacheInvalidated = true;
     }
   }
 
   private updateVisibility() {
     const playerTileX = Math.floor(this.gameState.player.position.x / 32);
     const playerTileY = Math.floor(this.gameState.player.position.y / 32);
-    const visionRange = 8;
+    const visionRange = this.isLowPerformanceDevice ? 6 : 8; // Reduce vision range on low-end devices
     
     const actualMapHeight = this.gameState.currentMap.tiles.length;
     const actualMapWidth = this.gameState.currentMap.tiles[0]?.length || 0;
@@ -535,9 +551,16 @@ export class GameEngine {
         .map(() => Array(actualMapWidth).fill(false));
     }
     
-    // Only update visibility for tiles in render bounds
-    for (let y = this.renderBounds.startY; y < this.renderBounds.endY; y++) {
-      for (let x = this.renderBounds.startX; x < this.renderBounds.endX; x++) {
+    // Only update visibility for tiles in a smaller area around player
+    const visibilityBounds = {
+      startX: Math.max(0, playerTileX - visionRange - 2),
+      startY: Math.max(0, playerTileY - visionRange - 2),
+      endX: Math.min(actualMapWidth, playerTileX + visionRange + 3),
+      endY: Math.min(actualMapHeight, playerTileY + visionRange + 3)
+    };
+    
+    for (let y = visibilityBounds.startY; y < visibilityBounds.endY; y++) {
+      for (let x = visibilityBounds.startX; x < visibilityBounds.endX; x++) {
         if (y >= 0 && y < actualMapHeight && x >= 0 && x < actualMapWidth) {
           this.gameState.currentMap.tiles[y][x].visible = false;
         }
@@ -545,10 +568,10 @@ export class GameEngine {
     }
     
     // Set visibility around player
-    const minY = Math.max(this.renderBounds.startY, playerTileY - visionRange);
-    const maxY = Math.min(this.renderBounds.endY, playerTileY + visionRange + 1);
-    const minX = Math.max(this.renderBounds.startX, playerTileX - visionRange);
-    const maxX = Math.min(this.renderBounds.endX, playerTileX + visionRange + 1);
+    const minY = Math.max(0, playerTileY - visionRange);
+    const maxY = Math.min(actualMapHeight, playerTileY + visionRange + 1);
+    const minX = Math.max(0, playerTileX - visionRange);
+    const maxX = Math.min(actualMapWidth, playerTileX + visionRange + 1);
     
     for (let y = minY; y < maxY; y++) {
       for (let x = minX; x < maxX; x++) {
@@ -565,7 +588,7 @@ export class GameEngine {
   }
 
   private gameLoop(currentTime: number) {
-    // Frame rate limiting
+    // Improved frame rate limiting with skip logic
     const deltaTime = currentTime - this.lastTime;
     
     if (deltaTime >= this.frameInterval) {
@@ -575,10 +598,16 @@ export class GameEngine {
       this.updatePlayerMovement(deltaTime);
       this.updateGameTime(deltaTime);
 
-      // Only render if enough time has passed
-      if (currentTime - this.lastRenderTime >= this.frameInterval) {
+      // Smart rendering - skip frames when performance is poor
+      const shouldRender = this.renderSkipCounter >= this.maxRenderSkip || 
+                          (currentTime - this.lastRenderTime >= this.frameInterval * 2);
+      
+      if (shouldRender) {
         this.render();
         this.lastRenderTime = currentTime;
+        this.renderSkipCounter = 0;
+      } else {
+        this.renderSkipCounter++;
       }
     }
 
@@ -599,7 +628,8 @@ export class GameEngine {
     this.ctx.fillStyle = '#1a1a1a';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    if (this.settings.lowGraphicsMode || this.isLowPerformanceDevice) {
+    // Always use optimized rendering
+    if (true) { // Force optimized rendering for better performance
       this.renderLowGraphics();
     } else {
       this.renderTiles();
@@ -652,7 +682,12 @@ export class GameEngine {
     const startX = Math.max(0, Math.min(this.renderBounds.startX, actualMapWidth - 1));
     const endX = Math.min(this.renderBounds.endX, actualMapWidth);
     
-    // Only render visible tiles with simple colors
+    // Batch rendering for better performance
+    this.ctx.save();
+    
+    // Pre-calculate colors to avoid repeated function calls
+    const colorCache = new Map<string, string>();
+    
     for (let y = startY; y < endY; y++) {
       for (let x = startX; x < endX; x++) {
         if (!this.gameState.currentMap.tiles[y] || !this.gameState.currentMap.tiles[y][x]) {
@@ -666,16 +701,28 @@ export class GameEngine {
 
         const screenX = x * 32 - this.gameState.camera.x;
         const screenY = y * 32 - this.gameState.camera.y;
+        
+        // Skip tiles that are completely off-screen
+        if (screenX < -32 || screenX > this.canvas.width || 
+            screenY < -32 || screenY > this.canvas.height) continue;
 
-        let color = this.getTileColor(tile.type);
-        if (!this.gameState.currentMap.isInterior && !tile.visible) {
-          color = this.darkenColor(color, 0.5);
+        const cacheKey = `${tile.type}_${tile.visible}_${this.gameState.currentMap.isInterior}`;
+        let color = colorCache.get(cacheKey);
+        
+        if (!color) {
+          color = this.getTileColor(tile.type);
+          if (!this.gameState.currentMap.isInterior && !tile.visible) {
+            color = this.darkenColor(color, 0.5);
+          }
+          colorCache.set(cacheKey, color);
         }
 
         this.ctx.fillStyle = color;
         this.ctx.fillRect(screenX, screenY, 32, 32);
       }
     }
+    
+    this.ctx.restore();
     
     this.renderPlayer();
     this.renderNearbyEntities();
@@ -684,7 +731,7 @@ export class GameEngine {
   
   private renderNearbyEntities() {
     const playerPos = this.gameState.player.position;
-    const renderDistance = 200;
+    const renderDistance = this.isLowPerformanceDevice ? 150 : 200;
     
     // Render nearby NPCs
     this.gameState.currentMap.npcs.forEach(npc => {
@@ -696,6 +743,10 @@ export class GameEngine {
       if (distance <= renderDistance) {
         const screenX = npc.position.x - this.gameState.camera.x;
         const screenY = npc.position.y - this.gameState.camera.y;
+        
+        // Skip if off-screen
+        if (screenX < -16 || screenX > this.canvas.width + 16 || 
+            screenY < -16 || screenY > this.canvas.height + 16) return;
         
         this.ctx.fillStyle = npc.isHostile ? '#ff4444' : '#44ff44';
         this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
@@ -712,6 +763,10 @@ export class GameEngine {
       if (distance <= renderDistance) {
         const screenX = enemy.position.x - this.gameState.camera.x;
         const screenY = enemy.position.y - this.gameState.camera.y;
+        
+        // Skip if off-screen
+        if (screenX < -16 || screenX > this.canvas.width + 16 || 
+            screenY < -16 || screenY > this.canvas.height + 16) return;
         
         this.ctx.fillStyle = '#ff0000';
         this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
@@ -767,6 +822,9 @@ export class GameEngine {
     this.notifyStateChange();
   }
   private renderSimpleUI() {
+    // Batch UI rendering
+    this.ctx.save();
+    
     const healthPercent = this.gameState.player.health / this.gameState.player.maxHealth;
     this.ctx.fillStyle = '#333333';
     this.ctx.fillRect(10, 10, 150, 15);
@@ -778,6 +836,8 @@ export class GameEngine {
     this.ctx.textAlign = 'left';
     this.ctx.fillText(`HP: ${this.gameState.player.health}/${this.gameState.player.maxHealth}`, 15, 22);
     this.ctx.fillText(`Level: ${this.gameState.player.level}`, 15, 40);
+    
+    this.ctx.restore();
   }
 
   private renderTiles() {
@@ -1017,6 +1077,9 @@ export class GameEngine {
   }
 
   private renderMiniMap() {
+    // Skip minimap on low performance devices
+    if (this.isLowPerformanceDevice) return;
+    
     const miniMapSize = 120;
     const miniMapX = this.canvas.width - miniMapSize - 10;
     const miniMapY = 10;
@@ -1029,11 +1092,12 @@ export class GameEngine {
     const scaleX = miniMapSize / this.gameState.currentMap.width;
     const scaleY = miniMapSize / this.gameState.currentMap.height;
     
-    // Sample tiles for performance (every 4th tile)
-    const sampleRate = this.isLowPerformanceDevice ? 8 : 4;
+    // Increase sample rate for better performance
+    const sampleRate = 6;
     
     for (let y = 0; y < this.gameState.currentMap.height; y += sampleRate) {
       for (let x = 0; x < this.gameState.currentMap.width; x += sampleRate) {
+        if (!this.gameState.currentMap.tiles[y] || !this.gameState.currentMap.tiles[y][x]) continue;
         const tile = this.gameState.currentMap.tiles[y][x];
         if (!tile.discovered) continue;
         
