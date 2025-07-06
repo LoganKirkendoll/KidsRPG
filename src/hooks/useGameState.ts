@@ -90,7 +90,7 @@ export const useGameState = () => {
         goldSpent: 0
       },
       visibilityMap: [],
-      quests: [allQuests.find(q => q.id === 'escape_vault_101') || allQuests[0]], // Start with the escape quest
+      quests: [allQuests.find(q => q.id === 'escape_vault_101')!], // Start with the escape quest
       devMode: {
         enabled: false,
         selectedTool: 'quest',

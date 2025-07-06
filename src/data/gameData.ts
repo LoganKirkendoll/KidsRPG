@@ -272,16 +272,7 @@ export const createStartingCharacter = (name: string, characterClass: keyof type
 };
 
 export const createStartingMap = (): GameMap => {
-  // Initialize the visibility map properly for new games
-  const map = maps.capital_wasteland();
-  
-  // Ensure the map has proper structure
-  if (!map.tiles || !Array.isArray(map.tiles)) {
-    console.error('Map tiles not properly initialized');
-    return map;
-  }
-  
-  return map;
+  return maps.capital_wasteland();
 };
 
 export const achievements: Achievement[] = [
