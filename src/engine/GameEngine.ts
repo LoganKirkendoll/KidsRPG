@@ -602,7 +602,6 @@ export class GameEngine {
         return;
       }
       }
-    }
   }
 
   private startDialogue(npcId: string) {
