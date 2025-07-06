@@ -232,8 +232,12 @@ export class GameEngine {
       const mapWidth = this.gameState.currentMap.width * 32;
       const mapHeight = this.gameState.currentMap.height * 32;
       
+      // Add buffer zone to prevent edge flickering
+      const edgeBuffer = 16;
+      
       // Check for map transitions
-      if (newX < 0 || newX >= mapWidth || newY < 0 || newY >= mapHeight) {
+      if (newX < -edgeBuffer || newX >= mapWidth + edgeBuffer || 
+          newY < -edgeBuffer || newY >= mapHeight + edgeBuffer) {
         this.handleMapTransition(newX, newY, mapWidth, mapHeight);
         return;
       }
@@ -267,6 +271,7 @@ export class GameEngine {
     this.isTransitioning = true;
     
     let direction: 'north' | 'south' | 'east' | 'west' | null = null;
+    let targetPosition: Position | null = null;
     
     if (newX < 0) direction = 'west';
     else if (newX >= mapWidth) direction = 'east';
@@ -277,7 +282,10 @@ export class GameEngine {
     
     // Find connection for this direction
     const connection = this.gameState.currentMap.connections.find(conn => conn.direction === direction);
-    if (!connection) return;
+    if (!connection) {
+      this.isTransitioning = false;
+      return;
+    }
     
     // Load target map if not already loaded
     let targetMap = this.loadedMaps[connection.targetMapId];
@@ -288,8 +296,30 @@ export class GameEngine {
         targetMap = createMapFn();
         this.loadedMaps[connection.targetMapId] = targetMap;
       } else {
+        this.isTransitioning = false;
         return;
       }
+    }
+    
+    // Calculate proper target position based on direction
+    switch (direction) {
+      case 'north':
+        targetPosition = { x: connection.toPosition.x, y: (targetMap.height - 2) * 32 };
+        break;
+      case 'south':
+        targetPosition = { x: connection.toPosition.x, y: 32 };
+        break;
+      case 'east':
+        targetPosition = { x: 32, y: connection.toPosition.y };
+        break;
+      case 'west':
+        targetPosition = { x: (targetMap.width - 2) * 32, y: connection.toPosition.y };
+        break;
+    }
+    
+    if (!targetPosition) {
+      this.isTransitioning = false;
+      return;
     }
     
     // Unload previous map to save memory (keep only current and adjacent)
@@ -303,8 +333,29 @@ export class GameEngine {
     // Switch to new map
     this.gameState.currentMap = targetMap;
     
-    // Set player position at the connection point
-    this.gameState.player.position = { ...connection.toPosition };
+    // Set player position with proper offset from edge
+    this.gameState.player.position = { ...targetPosition };
+    
+    // Ensure player is on a walkable tile
+    const tileX = Math.floor(this.gameState.player.position.x / 32);
+    const tileY = Math.floor(this.gameState.player.position.y / 32);
+    
+    if (!this.isValidPosition(tileX, tileY)) {
+      // Find nearest walkable tile
+      for (let radius = 1; radius <= 5; radius++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            const checkX = tileX + dx;
+            const checkY = tileY + dy;
+            if (this.isValidPosition(checkX, checkY)) {
+              this.gameState.player.position.x = checkX * 32 + 16;
+              this.gameState.player.position.y = checkY * 32 + 16;
+              break;
+            }
+          }
+        }
+      }
+    }
     
     // Update camera and visibility
     this.updateCamera();
@@ -313,10 +364,10 @@ export class GameEngine {
     // Notify state change
     this.notifyStateChange();
     
-    // Reset transition flag after a short delay to prevent immediate re-triggering
+    // Reset transition flag after a longer delay to ensure smooth transition
     setTimeout(() => {
       this.isTransitioning = false;
-    }, 100);
+    }, 300);
   }
 
   private isValidPosition(tileX: number, tileY: number): boolean {
