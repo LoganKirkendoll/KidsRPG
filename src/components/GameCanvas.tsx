@@ -1,19 +1,20 @@
 import React, { useRef, useEffect } from 'react';
 import { GameEngine } from '../engine/GameEngine';
-import { GameState } from '../types/game';
+import { GameState, GameSettings } from '../types/game';
 
 interface GameCanvasProps {
   gameState: GameState;
+  settings?: GameSettings;
   onGameStateChange: (newState: GameState) => void;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onGameStateChange }) => {
+const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, settings, onGameStateChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
 
   useEffect(() => {
     if (canvasRef.current && !engineRef.current) {
-      engineRef.current = new GameEngine(canvasRef.current, gameState);
+      engineRef.current = new GameEngine(canvasRef.current, gameState, settings);
       
       // Set up state change callback
       engineRef.current.setStateChangeCallback(onGameStateChange);

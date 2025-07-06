@@ -429,6 +429,8 @@ function App() {
           onLoadGame={loadGame}
           onSettings={handleSettings}
           onQuit={quitGame}
+          settings={settings}
+          onUpdateSettings={updateSettings}
         />
       );
 
@@ -547,6 +549,7 @@ function App() {
         <div className="relative">
           <GameCanvas
             gameState={gameState}
+            settings={settings}
             onGameStateChange={updateGameState}
           />
           

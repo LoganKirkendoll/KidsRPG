@@ -121,6 +121,7 @@ export class SaveSystem {
       musicVolume: 0.8,
       sfxVolume: 0.8,
       graphics: 'high',
+      lowGraphicsMode: false,
       fullscreen: false,
       showFPS: true,
       autoSave: true,

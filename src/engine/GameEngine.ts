@@ -4,19 +4,25 @@ export class GameEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private gameState: GameState;
+  private settings: any;
   private keys: { [key: string]: boolean } = {};
   private lastTime = 0;
   private animationId: number | null = null;
   private stateChangeCallback?: (newState: GameState) => void;
   private lootableCallback?: (lootable: any) => void;
+  private loadedMaps: { [key: string]: GameMap } = {};
 
-  constructor(canvas: HTMLCanvasElement, initialGameState: GameState) {
+  constructor(canvas: HTMLCanvasElement, initialGameState: GameState, settings?: any) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.gameState = { ...initialGameState };
+    this.settings = settings || { lowGraphicsMode: false };
     
     this.canvas.width = 800;
     this.canvas.height = 600;
+    
+    // Load only current map initially
+    this.loadedMaps[this.gameState.currentMap.id] = this.gameState.currentMap;
     
     this.setupEventListeners();
     this.gameLoop(0);
@@ -117,17 +123,31 @@ export class GameEngine {
     }
 
     // Check for lootables
-    const nearbyLootable = this.gameState.currentMap.lootables.find(lootable => {
+    const nearbyLootable = this.gameState.currentMap.lootables.find((lootable, index) => {
       if (lootable.looted) return false;
       const distance = Math.sqrt(
         Math.pow(lootable.position.x - playerPos.x, 2) + 
         Math.pow(lootable.position.y - playerPos.y, 2)
       );
-      return distance <= interactionRange;
+      if (distance <= interactionRange) {
+        // Mark as looted and remove from map when interacted with
+        lootable.looted = true;
+        return true;
+      }
+      return false;
     });
 
     if (nearbyLootable && this.lootableCallback) {
       this.lootableCallback(nearbyLootable);
+      
+      // Remove looted item from map after a short delay
+      setTimeout(() => {
+        const lootIndex = this.gameState.currentMap.lootables.findIndex(l => l.id === nearbyLootable.id);
+        if (lootIndex >= 0) {
+          this.gameState.currentMap.lootables.splice(lootIndex, 1);
+          this.notifyStateChange();
+        }
+      }, 100);
       return;
     }
   }
@@ -252,15 +272,33 @@ export class GameEngine {
     const connection = this.gameState.currentMap.connections.find(conn => conn.direction === direction);
     if (!connection) return;
     
-    // Get target map
-    const targetMap = this.gameState.availableMaps[connection.targetMapId];
-    if (!targetMap) return;
+    // Load target map if not already loaded
+    let targetMap = this.loadedMaps[connection.targetMapId];
+    if (!targetMap) {
+      // Create the map on demand
+      const { maps } = require('../data/maps');
+      const createMapFn = maps[connection.targetMapId];
+      if (createMapFn) {
+        targetMap = createMapFn();
+        this.loadedMaps[connection.targetMapId] = targetMap;
+      } else {
+        return;
+      }
+    }
     
     // Store previous map
     this.gameState.previousMap = {
       map: this.gameState.currentMap,
       position: { ...this.gameState.player.position }
     };
+    
+    // Unload previous map to save memory (keep only current and adjacent)
+    const currentMapId = this.gameState.currentMap.id;
+    Object.keys(this.loadedMaps).forEach(mapId => {
+      if (mapId !== connection.targetMapId && mapId !== currentMapId) {
+        delete this.loadedMaps[mapId];
+      }
+    });
     
     // Switch to new map
     this.gameState.currentMap = targetMap;
@@ -367,19 +405,108 @@ export class GameEngine {
     this.ctx.fillStyle = '#1a1a1a';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Render tiles
-    this.renderTiles();
+    if (this.settings.lowGraphicsMode) {
+      this.renderLowGraphics();
+    } else {
+      // Render tiles
+      this.renderTiles();
+      
+      // Render entities
+      this.renderNPCs();
+      this.renderEnemies();
+      this.renderLootables();
+      
+      // Render player
+      this.renderPlayer();
+      
+      // Render UI
+      this.renderUI();
+    }
+  }
+  
+  private renderLowGraphics() {
+    // Simplified rendering for low-end devices
+    const startX = Math.floor(this.gameState.camera.x / 32);
+    const startY = Math.floor(this.gameState.camera.y / 32);
+    const endX = Math.min(startX + Math.ceil(this.canvas.width / 32) + 1, this.gameState.currentMap.width);
+    const endY = Math.min(startY + Math.ceil(this.canvas.height / 32) + 1, this.gameState.currentMap.height);
+
+    // Render only visible tiles with simple colors
+    for (let y = Math.max(0, startY); y < endY; y++) {
+      for (let x = Math.max(0, startX); x < endX; x++) {
+        const tile = this.gameState.currentMap.tiles[y][x];
+        if (!tile.discovered) continue;
+
+        const screenX = x * 32 - this.gameState.camera.x;
+        const screenY = y * 32 - this.gameState.camera.y;
+
+        // Simple tile colors without borders
+        let color = this.getTileColor(tile.type);
+        if (!tile.visible) {
+          color = this.darkenColor(color, 0.5);
+        }
+
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(screenX, screenY, 32, 32);
+      }
+    }
     
-    // Render entities
-    this.renderNPCs();
-    this.renderEnemies();
-    this.renderLootables();
-    
-    // Render player
+    // Render only player and nearby entities
     this.renderPlayer();
+    this.renderNearbyEntities();
+    this.renderSimpleUI();
+  }
+  
+  private renderNearbyEntities() {
+    const playerPos = this.gameState.player.position;
+    const renderDistance = 200; // Only render entities within 200 pixels
     
-    // Render UI
-    this.renderUI();
+    // Render nearby NPCs
+    this.gameState.currentMap.npcs.forEach(npc => {
+      const distance = Math.sqrt(
+        Math.pow(npc.position.x - playerPos.x, 2) + 
+        Math.pow(npc.position.y - playerPos.y, 2)
+      );
+      
+      if (distance <= renderDistance) {
+        const screenX = npc.position.x - this.gameState.camera.x;
+        const screenY = npc.position.y - this.gameState.camera.y;
+        
+        this.ctx.fillStyle = npc.isHostile ? '#ff4444' : '#44ff44';
+        this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+      }
+    });
+    
+    // Render nearby enemies
+    this.gameState.currentMap.enemies.forEach(enemy => {
+      const distance = Math.sqrt(
+        Math.pow(enemy.position.x - playerPos.x, 2) + 
+        Math.pow(enemy.position.y - playerPos.y, 2)
+      );
+      
+      if (distance <= renderDistance) {
+        const screenX = enemy.position.x - this.gameState.camera.x;
+        const screenY = enemy.position.y - this.gameState.camera.y;
+        
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.fillRect(screenX - 8, screenY - 8, 16, 16);
+      }
+    });
+  }
+  
+  private renderSimpleUI() {
+    // Simplified UI for low graphics mode
+    const healthPercent = this.gameState.player.health / this.gameState.player.maxHealth;
+    this.ctx.fillStyle = '#333333';
+    this.ctx.fillRect(10, 10, 150, 15);
+    this.ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
+    this.ctx.fillRect(10, 10, 150 * healthPercent, 15);
+    
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = '12px Arial';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`HP: ${this.gameState.player.health}/${this.gameState.player.maxHealth}`, 15, 22);
+    this.ctx.fillText(`Level: ${this.gameState.player.level}`, 15, 40);
   }
 
   private renderTiles() {
@@ -529,7 +656,7 @@ export class GameEngine {
 
   private renderLootables() {
     this.gameState.currentMap.lootables.forEach(lootable => {
-      if (lootable.looted) return;
+      if (lootable.looted) return; // Don't render looted items
 
       const screenX = lootable.position.x - this.gameState.camera.x;
       const screenY = lootable.position.y - this.gameState.camera.y;

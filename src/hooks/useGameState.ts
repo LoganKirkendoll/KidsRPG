@@ -29,8 +29,9 @@ export const useGameState = () => {
 
   const createNewGame = useCallback((playerName: string, characterClass: any) => {
     const player = createStartingCharacter(playerName, characterClass);
-    const allMaps = createAllMaps();
-    const startingMap = allMaps['capital_wasteland'];
+    // Only create the starting map initially
+    const { maps } = require('../data/maps');
+    const startingMap = maps['capital_wasteland']();
     
     // Add starting items to inventory
     const startingInventory: Item[] = [
@@ -47,7 +48,7 @@ export const useGameState = () => {
       inventory: startingInventory,
       gold: 100,
       currentMap: startingMap,
-      availableMaps: allMaps,
+      availableMaps: {}, // Maps will be loaded on demand
       mapPosition: { x: 25, y: 25 },
       camera: { x: 0, y: 0 },
       gameTime: 0,

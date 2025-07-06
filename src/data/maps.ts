@@ -140,8 +140,8 @@ export const createLootables = (width: number, height: number, density: number =
 
 // CAPITAL WASTELAND - Starting area with proper paths
 export const createCapitalWasteland = (): GameMap => {
-  const width = 60;
-  const height = 60;
+  const width = 120;
+  const height = 120;
   const tiles: Tile[][] = [];
   
   // Initialize with grass as base terrain
@@ -167,9 +167,10 @@ export const createCapitalWasteland = (): GameMap => {
   
   // Add water features (small ponds)
   const waterAreas = [
-    { x: 10, y: 10, radius: 3 },
-    { x: 45, y: 35, radius: 2 },
-    { x: 25, y: 50, radius: 2 }
+    { x: 20, y: 20, radius: 4 },
+    { x: 90, y: 70, radius: 3 },
+    { x: 50, y: 100, radius: 3 },
+    { x: 80, y: 30, radius: 2 }
   ];
   
   waterAreas.forEach(area => {
@@ -184,14 +185,47 @@ export const createCapitalWasteland = (): GameMap => {
   });
   
   // Create main roads
-  createMainRoad(tiles, 'horizontal', 30, 'stone'); // Main east-west road
-  createMainRoad(tiles, 'vertical', 30, 'stone');   // Main north-south road
+  createMainRoad(tiles, 'horizontal', 60, 'stone'); // Main east-west road
+  createMainRoad(tiles, 'vertical', 60, 'stone');   // Main north-south road
   
-  // Create buildings with proper areas
+  // Create multiple cities and settlements
   const buildings = [
+    // MEGATON CITY - Main settlement
+    { x: 30, y: 30, width: 8, height: 6, type: 'settlement', name: 'Megaton City Hall' },
+    { x: 25, y: 40, width: 6, height: 4, type: 'market', name: 'Megaton Market' },
+    { x: 40, y: 35, width: 5, height: 4, type: 'clinic', name: 'Megaton Medical' },
+    { x: 35, y: 25, width: 4, height: 3, type: 'trader_post', name: 'Craterside Supply' },
+    { x: 45, y: 40, width: 4, height: 3, type: 'workshop', name: 'Megaton Workshop' },
+    
+    // RIVET CITY - Eastern settlement
+    { x: 85, y: 50, width: 12, height: 8, type: 'city_hall', name: 'Rivet City Council' },
+    { x: 80, y: 65, width: 8, height: 5, type: 'market', name: 'Rivet City Market' },
+    { x: 95, y: 60, width: 6, height: 4, type: 'clinic', name: 'Rivet City Medical' },
+    { x: 75, y: 45, width: 5, height: 4, type: 'trader_post', name: 'Rivet City Trading' },
+    { x: 100, y: 45, width: 4, height: 3, type: 'workshop', name: 'Rivet City Tech' },
+    
+    // CANTERBURY COMMONS - Central trading hub
+    { x: 55, y: 75, width: 6, height: 4, type: 'market', name: 'Canterbury Market' },
+    { x: 65, y: 80, width: 5, height: 3, type: 'trader_post', name: 'Uncle Roe\'s Trading' },
+    { x: 50, y: 85, width: 4, height: 3, type: 'clinic', name: 'Canterbury Medical' },
+    
+    // TENPENNY TOWER - Luxury settlement
+    { x: 15, y: 80, width: 8, height: 10, type: 'luxury_tower', name: 'Tenpenny Tower' },
+    { x: 10, y: 95, width: 5, height: 3, type: 'market', name: 'Tenpenny Market' },
+    { x: 25, y: 92, width: 4, height: 3, type: 'clinic', name: 'Tenpenny Medical' },
+    
+    // AREFU - Small settlement
+    { x: 90, y: 15, width: 5, height: 4, type: 'settlement', name: 'Arefu Town Hall' },
+    { x: 85, y: 25, width: 4, height: 3, type: 'trader_post', name: 'Arefu Trading' },
+    { x: 95, y: 20, width: 3, height: 2, type: 'clinic', name: 'Arefu Medical' },
+    
+    // VAULT 101
     { x: 15, y: 15, width: 8, height: 6, type: 'vault', name: 'Vault 101' },
-    { x: 40, y: 20, width: 6, height: 4, type: 'settlement', name: 'Megaton' },
-    { x: 25, y: 45, width: 5, height: 4, type: 'trader_post', name: 'Craterside Supply' }
+    
+    // Scattered buildings
+    { x: 70, y: 25, width: 4, height: 3, type: 'workshop', name: 'Scrapyard Workshop' },
+    { x: 25, y: 70, width: 3, height: 2, type: 'trader_post', name: 'Lone Wanderer Trading' },
+    { x: 105, y: 85, width: 4, height: 3, type: 'clinic', name: 'Wasteland Medical' }
   ];
   
   buildings.forEach(building => {
@@ -204,14 +238,16 @@ export const createCapitalWasteland = (): GameMap => {
     // Connect to main roads
     const buildingCenterX = building.x + Math.floor(building.width / 2);
     const buildingCenterY = building.y + Math.floor(building.height / 2);
-    createPath(tiles, buildingCenterX, buildingCenterY, 30, 30, 'dirt');
+    createPath(tiles, buildingCenterX, buildingCenterY, 60, 60, 'dirt');
   });
   
   // Add some ruins scattered around
   const ruinAreas = [
-    { x: 5, y: 25, radius: 4 },
-    { x: 50, y: 10, radius: 3 },
-    { x: 35, y: 50, radius: 3 }
+    { x: 10, y: 50, radius: 5 },
+    { x: 100, y: 20, radius: 4 },
+    { x: 70, y: 100, radius: 4 },
+    { x: 40, y: 10, radius: 3 },
+    { x: 110, y: 110, radius: 3 }
   ];
   
   ruinAreas.forEach(area => {
@@ -222,26 +258,26 @@ export const createCapitalWasteland = (): GameMap => {
     {
       direction: 'north',
       targetMapId: 'northern_wasteland',
-      fromPosition: { x: 30 * 32, y: 0 },
-      toPosition: { x: 30 * 32, y: 59 * 32 }
+      fromPosition: { x: 60 * 32, y: 0 },
+      toPosition: { x: 60 * 32, y: 119 * 32 }
     },
     {
       direction: 'south',
       targetMapId: 'southern_ruins',
-      fromPosition: { x: 30 * 32, y: 59 * 32 },
-      toPosition: { x: 30 * 32, y: 0 }
+      fromPosition: { x: 60 * 32, y: 119 * 32 },
+      toPosition: { x: 60 * 32, y: 0 }
     },
     {
       direction: 'east',
       targetMapId: 'eastern_districts',
-      fromPosition: { x: 59 * 32, y: 30 * 32 },
-      toPosition: { x: 0, y: 30 * 32 }
+      fromPosition: { x: 119 * 32, y: 60 * 32 },
+      toPosition: { x: 0, y: 60 * 32 }
     },
     {
       direction: 'west',
       targetMapId: 'western_outskirts',
-      fromPosition: { x: 0, y: 30 * 32 },
-      toPosition: { x: 59 * 32, y: 30 * 32 }
+      fromPosition: { x: 0, y: 60 * 32 },
+      toPosition: { x: 119 * 32, y: 60 * 32 }
     }
   ];
   
