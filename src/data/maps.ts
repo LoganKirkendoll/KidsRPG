@@ -525,8 +525,8 @@ export const createCitadel = (): GameMap => {
 
 // METRO TUNNELS - Underground system (smaller)
 export const createMetroTunnels = (): GameMap => {
-  const width = 60;
-  const height = 40;
+  const width = 80;
+  const height = 25;
   const tiles: Tile[][] = [];
   
   for (let y = 0; y < height; y++) {
@@ -536,10 +536,8 @@ export const createMetroTunnels = (): GameMap => {
       let type = 'ruins';
       let walkable = true;
       
-      if (random < 0.1) { type = 'water'; walkable = false; }
-      else if (random < 0.15) { type = 'building'; walkable = false; }
-      else if (random < 0.3) type = 'stone';
-      else if (random < 0.5) type = 'dirt';
+      if (random < 0.2) { type = 'water'; walkable = false; }
+      else if (random < 0.3) type = 'building';
       
       row.push(createTile(x, y, type, walkable));
     }
@@ -547,15 +545,15 @@ export const createMetroTunnels = (): GameMap => {
   }
   
   // Metro stations
-  createBuilding(tiles, 10, 15, 8, 6, 'metro_station', 'Dupont Circle Station');
-  createBuilding(tiles, 30, 20, 8, 6, 'metro_station', 'Gallery Place Station');
-  createBuilding(tiles, 45, 10, 8, 6, 'metro_station', 'Union Station');
+  createBuilding(tiles, 15, 10, 6, 4, 'metro_station', 'Dupont Circle Station');
+  createBuilding(tiles, 40, 8, 6, 4, 'metro_station', 'Gallery Place Station');
+  createBuilding(tiles, 65, 12, 6, 4, 'metro_station', 'Union Station');
   
   const connections: MapConnection[] = [
     {
       direction: 'east',
       targetMapId: 'western_outskirts',
-      fromPosition: { x: 59 * 32, y: 20 * 32 },
+      fromPosition: { x: 79 * 32, y: 12 * 32 },
       toPosition: { x: 0, y: 30 * 32 }
     }
   ];

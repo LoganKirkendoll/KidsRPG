@@ -219,11 +219,7 @@ export class GameEngine {
       const tileX = Math.floor(newX / 32);
       const tileY = Math.floor(newY / 32);
       
-      // Add bounds checking to prevent getting stuck
-      if (tileX >= 0 && tileY >= 0 && 
-          tileX < this.gameState.currentMap.width && 
-          tileY < this.gameState.currentMap.height &&
-          this.isValidPosition(tileX, tileY)) {
+      if (this.isValidPosition(tileX, tileY)) {
         this.gameState.player.position.x = newX;
         this.gameState.player.position.y = newY;
         this.gameState.player.isMoving = true;
@@ -245,10 +241,10 @@ export class GameEngine {
   private handleMapTransition(newX: number, newY: number, mapWidth: number, mapHeight: number) {
     let direction: 'north' | 'south' | 'east' | 'west' | null = null;
     
-    if (newX < -16) direction = 'west';
-    else if (newX >= mapWidth + 16) direction = 'east';
-    else if (newY < -16) direction = 'north';
-    else if (newY >= mapHeight + 16) direction = 'south';
+    if (newX < 0) direction = 'west';
+    else if (newX >= mapWidth) direction = 'east';
+    else if (newY < 0) direction = 'north';
+    else if (newY >= mapHeight) direction = 'south';
     
     if (!direction) return;
     
