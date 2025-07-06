@@ -136,6 +136,16 @@ export const createCapitalWasteland = (): GameMap => {
     tiles.push(row);
   }
   
+  // Create a clear starting area around the player spawn point (50, 50)
+  const startX = 50, startY = 50;
+  for (let y = startY - 5; y <= startY + 5; y++) {
+    for (let x = startX - 5; x <= startX + 5; x++) {
+      if (x >= 0 && x < width && y >= 0 && y < height) {
+        tiles[y][x] = createTile(x, y, 'grass', true);
+      }
+    }
+  }
+  
   // MEGATON - Major settlement (expanded)
   const megatonX = 40, megatonY = 40;
   createBuilding(tiles, megatonX, megatonY, 20, 15, 'settlement', 'Megaton');
