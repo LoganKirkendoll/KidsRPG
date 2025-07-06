@@ -209,8 +209,8 @@ export class GameEngine {
       const mapWidth = this.gameState.currentMap.width * 32;
       const mapHeight = this.gameState.currentMap.height * 32;
       
-      // Check for map transitions with a small buffer
-      if (newX < -16 || newX >= mapWidth + 16 || newY < -16 || newY >= mapHeight + 16) {
+      // Check for map transitions
+      if (newX < 0 || newX >= mapWidth || newY < 0 || newY >= mapHeight) {
         this.handleMapTransition(newX, newY, mapWidth, mapHeight);
         return;
       }
@@ -245,31 +245,20 @@ export class GameEngine {
   private handleMapTransition(newX: number, newY: number, mapWidth: number, mapHeight: number) {
     let direction: 'north' | 'south' | 'east' | 'west' | null = null;
     
-    // Check which edge the player is trying to cross
-    if (newX < 0) direction = 'west';
-    else if (newX >= mapWidth) direction = 'east';
-    else if (newY < 0) direction = 'north';
-    else if (newY >= mapHeight) direction = 'south';
+    if (newX < -16) direction = 'west';
+    else if (newX >= mapWidth + 16) direction = 'east';
+    else if (newY < -16) direction = 'north';
+    else if (newY >= mapHeight + 16) direction = 'south';
     
     if (!direction) return;
     
-    console.log(`Attempting to travel ${direction} from ${this.gameState.currentMap.name}`);
-    
     // Find connection for this direction
     const connection = this.gameState.currentMap.connections.find(conn => conn.direction === direction);
-    if (!connection) {
-      console.log(`No connection found for direction: ${direction}`);
-      return;
-    }
+    if (!connection) return;
     
     // Get target map
     const targetMap = this.gameState.availableMaps[connection.targetMapId];
-    if (!targetMap) {
-      console.log(`Target map not found: ${connection.targetMapId}`);
-      return;
-    }
-    
-    console.log(`Transitioning to: ${targetMap.name}`);
+    if (!targetMap) return;
     
     // Store previous map
     this.gameState.previousMap = {
@@ -280,7 +269,7 @@ export class GameEngine {
     // Switch to new map
     this.gameState.currentMap = targetMap;
     
-    // Set player position at the connection point with some padding
+    // Set player position at the connection point
     this.gameState.player.position = { ...connection.toPosition };
     
     // Update camera and visibility
